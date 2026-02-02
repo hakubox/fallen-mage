@@ -723,47 +723,61 @@
     // ==============================================================================
     const _Game_Message_setSpeakerName = Game_Message.prototype.setSpeakerName;
     Game_Message.prototype.setSpeakerName = function(speakerName) {
-        _Game_Message_setSpeakerName.call(this, speakerName);
-
+        // 1. 先进行基础的正则处理，把标签提取出来，并不此时就修改 speakerName
+        //    之所以不直接用父类方法，是因为要在父类方法调用前就把标签剥离干净
+        //    否则父类(Window_NameBox)可能会拿到带标签的脏数据
+        
         const pluginName = "ShowAndHideALLPic";
         const params = PluginManager.parameters(pluginName);
         const switchId = Number(params['SwitchId'] || 0);
         const ignoreNames = (params['IgnoreNames'] || "").split(',').map(s => s.trim());
-        
-        if ((switchId && !$gameSwitches.value(switchId)) || !$gameSystem._tachieVisible) return;
-        if (!speakerName) return;
 
-        // 1. 清洗名字 (去掉 <l>, <e> 等标签)
-        let processedName = speakerName;
-        // ... (省略复杂的正则提取，保持原样即可，只取核心名字) ...
-        // 为了代码简洁，只写核心部分，请确保你保留了之前提取 tempX, expression 的逻辑
-        // 这里假设 finalName 已经是干净的名字
-        const regLoc = /<l\s*(-?\d+)\s*,\s*(-?\d+)(?:\s*,\s*(\d+(?:\.\d+)?))?>/i;
+        // 临时变量用于提取
+        let tempProcessedName = speakerName || "";
         let tempX = null, tempY = null, tempScale = null;
-        if (regLoc.test(processedName)) {
-            processedName = processedName.replace(regLoc, (_, x, y, s) => {
-                tempX = Number(x); tempY = Number(y); tempScale = s ? Number(s) : null;
-                return "";
-            });
-        }
-        const regExp = /<(e.+?)>/i; 
         let expression = "";
-        if (regExp.test(processedName)) {
-            processedName = processedName.replace(regExp, (_, e) => {
-                expression = e.trim(); return "";
+
+        // --- 开始提取 <l> 标签 ---
+        const regLoc = /<l\s*(-?\d+)\s*,\s*(-?\d+)(?:\s*,\s*(\d+(?:\.\d+)?))?>/i;
+        if (regLoc.test(tempProcessedName)) {
+            tempProcessedName = tempProcessedName.replace(regLoc, (_, x, y, s) => {
+                tempX = Number(x); 
+                tempY = Number(y); 
+                tempScale = s ? Number(s) : null;
+                return ""; // 替换为空，即删除标签
             });
         }
-        const finalName = processedName.replace(/<[^>]+>/g, "").trim();
 
-        // 2. 关键修复：只要有人说话，就更新全局记录者！
-        // 这样 updateTone 才能知道“哦，现在是别人在说话，我该变灰了”
+        // --- 开始提取 <e> 标签 ---
+        // 注意正则写得稍微宽容一点，防止有奇怪的空格
+        const regExp = /<(e.+?)>/i; 
+        if (regExp.test(tempProcessedName)) {
+            tempProcessedName = tempProcessedName.replace(regExp, (_, e) => {
+                expression = e.trim(); 
+                return ""; // 替换为空，即删除标签
+            });
+        }
+        
+        // --- 清理剩余残留和首尾空格 ---
+        // 这一步得到的 cleanName 才是真正显示在名字框里的纯净名字
+        const cleanName = tempProcessedName.trim();
+
+        // 2. 调用父类方法，把干净的名字传进去！(这是修复显示问题的关键)
+        _Game_Message_setSpeakerName.call(this, cleanName);
+
+        // 如果开关没开或系统隐藏，就不做立绘逻辑，但名字已经被净化了
+        if ((switchId && !$gameSwitches.value(switchId)) || !$gameSystem._tachieVisible) return;
+        if (!cleanName) return;
+
+        // 3. 后续立绘逻辑使用 cleanName 继续处理
+        const finalName = cleanName; // 此时它已经是没有标签的了
+
+        // 更新当前说话人（用于变暗逻辑）
         if (finalName) {
             $gameSystem._currentSpeaker = finalName;
         }
 
-        // 3. 隐藏逻辑：只有“非忽略名单”的角色说话时，才清场
-        // 你的需求：菲伦(Ignore)说话 -> A 不隐藏 -> A 变灰
-        // 你的需求：B(Normal)说话 -> A 隐藏 -> B 变亮
+        // 隐藏逻辑
         const isIgnoredSpeaker = ignoreNames.includes(finalName);
 
         if (!isIgnoredSpeaker) {
@@ -775,7 +789,8 @@
             });
         }
 
-        // 4. 显示逻辑 (尝试显示当前说话人)
+        // 显示逻辑
+        // 注意：getConfigByName 内部也需要确保能匹配到 cleanName
         const config = getConfigByName(finalName);
         if (config || expression) {
             const globalDefaultX = Number(params['DefaultX'] || 640);
@@ -791,11 +806,12 @@
             let layer1 = expression ? folder + expression : null;
 
             if (layer0 || layer1) {
+                // 如果 layer1 (表情) 存在，确保 layer0 (身体) 也被传递或者保留
+                // 这里的逻辑假设是每次都重绘，如果需要更复杂的图层合并，showTachie 里已经处理了
                 $gameSystem.showTachie(finalName, [layer0, layer1], finalX, finalY, finalScale);
             }
         }
     };
-
 
 
     // --- 连贯性修复 ---
