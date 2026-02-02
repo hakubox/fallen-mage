@@ -820,8 +820,24 @@
 
     // --- 连贯性修复 ---
 
+    Game_Screen.prototype.getLeefInterpreter = function() {
+        // 1. 获取根解释器（地图 或 战斗）
+        let interpreter = $gameParty.inBattle() ? $gameTroop._interpreter : $gameMap._interpreter;
+        // 2. 循环向下查找，直到找到最底层的“叶子”解释器
+        // 只要存在子解释器，就说明当前正在运行子事件（如公共事件）
+        while (interpreter._childInterpreter) {
+            interpreter = interpreter._childInterpreter;
+        }
+
+        if (!interpreter || !interpreter.isRunning()) {
+            return false;
+        }
+
+        return interpreter;
+    };
+
     Game_Screen.prototype.isNextCommandContinuous = function() {
-        const interpreter = this.getInterpreter();
+        const interpreter = this.getLeefInterpreter();
         if (!interpreter || !interpreter.isRunning()) return false;
 
         const list = interpreter._list;
@@ -829,7 +845,7 @@
 
         const safeCodes = [
             0, 118, 108, 408, 117, 121, 122, 123, 230, 231, 232, 234, 235,
-            241, 245, 249, 250, 251, 205, 212, 213, 401, 402, 403, 404, 405
+            241, 245, 249, 250, 251, 205, 212, 213, 401, 402, 403, 404, 405, 357, 657, 505
         ];
 
         while (index < list.length) {
@@ -892,7 +908,24 @@
             // 正常流程：只执行隐藏，让 update 循环去处理淡出动画
             $gameSystem.hideAllTachies();
             // 【注意】：如果你一定要在事件结束立刻清除数据（牺牲淡出动画，换取内存绝对干净），
-            $gameSystem.cleanUpHiddenTachies();
+            // $gameSystem.cleanUpHiddenTachies();
+        }
+    };
+
+    // 2. 核心：在事件解释器结束时清理
+    const _Game_Interpreter_terminate = Game_Interpreter.prototype.terminate;
+    Game_Interpreter.prototype.terminate = function() {
+        _Game_Interpreter_terminate.call(this);
+        if (switchId && !$gameSwitches.value(switchId)) return;
+        // 1. 检查是否是地图的主解释器 (正在跑点击事件/自动事件/公共事件的那条线)
+        const isMapMain = (this === $gameMap._interpreter);
+        
+        // 2. 检查是否是战斗的主解释器
+        const isBattleMain = ($gameTroop && this === $gameTroop._interpreter);
+        // 仅当是 "主事件流" 彻底结束时，才执行清场
+        // 并行事件(Parallel)拥有自己独立的 interpreter 实例，不会触发这里，避免了并行事件如天气系统不停清除立绘的问题
+        if (isMapMain || isBattleMain) {
+            $gameSystem.hideAllTachies();
         }
     };
 
