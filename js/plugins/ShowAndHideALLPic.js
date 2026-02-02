@@ -361,16 +361,20 @@
             
             this.anchor.x = 0.5;
             this.anchor.y = 1.0; 
-
             // 基础坐标记录
             this._baseX = 0;
             this._baseY = 0;
-
             // --- 核心结构 ---
-            // 图层容器数组：存放 Sprite 对象
             this._layerSprites = []; 
-            // 图层文件记录：存放当前加载的文件名，用于对比变化
             this._layerFiles = [];
+            // --- [关键修复]：防止切菜单回不再闪现 ---
+            // 创建时检查一下：如果数据里标记为“隐藏目标(0)”，则直接按透明度0初始化
+            const data = this.getData();
+            if (data && data.targetOpacity === 0) {
+                this.opacity = 0;
+                // 强制同步数据里的当前透明度，防止update插值时产生反弹
+                data.opacity = 0; 
+            }
         }
 
         update() {
@@ -852,16 +856,43 @@
         }
     };
 
+    // ==============================================================================
+    // [新增] 场景切换与清理逻辑
+    // ==============================================================================
+    
+    // 辅助函数：清理 targetOpacity 为 0 的废弃数据
+    Game_System.prototype.cleanUpHiddenTachies = function() {
+        if (!this._tachieData) return;
+        Object.keys(this._tachieData).forEach(name => {
+            // 如果目标是隐藏，直接删除数据，释放内存，防止鬼影
+            if (this._tachieData[name].targetOpacity === 0) {
+                delete this._tachieData[name];
+            }
+        });
+    };
+
+    // 1. 离开场景时清理 (解决切菜单/战斗回来后的残留)
+    const _Scene_Base_terminate = Scene_Base.prototype.terminate;
+    Scene_Base.prototype.terminate = function() {
+        if ($gameSystem) $gameSystem.cleanUpHiddenTachies();
+        _Scene_Base_terminate.call(this);
+    };
+
+    // ==============================================================================
+    // 3. 对话/事件结束时的处理
+    // ==============================================================================
     const _Window_Message_terminateMessage = Window_Message.prototype.terminateMessage;
     Window_Message.prototype.terminateMessage = function() {
         _Window_Message_terminateMessage.call(this);
-
-        if (!$gameSwitches.value(switchId)) return;
-
+        if (switchId && !$gameSwitches.value(switchId)) return;
+        // 如果下一条指令是连续的（比如还有对话），就不隐藏
         if ($gameScreen.isNextCommandContinuous()) {
-            return; 
+            return;
         } else {
+            // 正常流程：只执行隐藏，让 update 循环去处理淡出动画
             $gameSystem.hideAllTachies();
+            // 【注意】：如果你一定要在事件结束立刻清除数据（牺牲淡出动画，换取内存绝对干净），
+            $gameSystem.cleanUpHiddenTachies();
         }
     };
 
