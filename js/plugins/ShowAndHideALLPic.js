@@ -477,17 +477,15 @@
             const currentSpeaker = $gameSystem._currentSpeaker;
             let targetTint = 0xFFFFFF; // 默认原色
             if (currentSpeaker && currentSpeaker !== this._characterName) {
-                const params = PluginManager.parameters("ShowAndHideALLPic"); 
-                const ignoreList = (params['IgnoreNames'] || "").split(',').map(s => s.trim());
+                const ignoreList = ignoreNames;
                 
                 // 只有当当前说话人有效（且不是自己）时，自己才变暗
                 // 注意：这里不需要判断 speaker 是否在 ignoreList，
                 // 因为照你的逻辑：菲伦(ignore)说话 -> A(非ignore) 应该变灰。
                 // 只要 A != 菲伦，且 A 也没在说话，A 就该黑。
                 
-                const maskOp = Number(params['MaskOpacity'] || 128);
                 // 计算灰度值：255(白) -> 0(黑)
-                let val = Math.max(0, 255 - maskOp);
+                let val = Math.max(0, 255 - maxMaskOpacity);
                 targetTint = (val << 16) | (val << 8) | val;
             }
             // 4. 遍历所有图层应用颜色 (修复因 Container 不传递 Tint 导致的无效问题)
@@ -773,7 +771,7 @@
         const expression = _actor.expression;
 
         // 2. 调用父类方法，把干净的名字传进去！(这是修复显示问题的关键)
-        _Game_Message_setSpeakerName.call(this, cleanName.name);
+        _Game_Message_setSpeakerName.call(this, cleanName);
 
         // 如果开关没开或系统隐藏，就不做立绘逻辑，但名字已经被净化了
         if ((switchId && !$gameSwitches.value(switchId)) || !$gameSystem._tachieVisible) return;
