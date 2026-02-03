@@ -644,7 +644,7 @@
 
         // 如果层级模式是 BELOW (默认)，直接添加进 spriteset (在图片层之上，但在对话框等Window层之下)
         if (layerPosition === 'BELOW') {
-             this.addChild(this._tachieContainer);
+            this.addChild(this._tachieContainer);
         }
         // 如果是 ABOVE，我们在 Scene 层级进行处理，这里只创建不添加，或者添加后移走
     };
@@ -721,6 +721,21 @@
         const cleanName = name.replace(/<[^>]+>/g, "").trim();
         return tachieConfigMap[cleanName] || null;
     }
+
+    Game_Message.prototype.getCurrentActorName = function(actorName) {
+        let expression = "";
+        let _actorName = actorName || '';
+        // --- 开始提取 <e> 标签 ---
+        // 注意正则写得稍微宽容一点，防止有奇怪的空格
+        const regExp = /<(e.+?)>/i; 
+        if (regExp.test(_actorName)) {
+            _actorName = _actorName.replace(regExp, (_, e) => {
+                expression = e.trim(); 
+                return ""; // 替换为空，即删除标签
+            });
+        }
+        return { name: _actorName.trim(), expression: expression.trim() };
+    }
     
     // ==============================================================================
     // 3. 逻辑控制层 (修正版 setSpeakerName：自动互斥与构建数组)
@@ -739,7 +754,6 @@
         // 临时变量用于提取
         let tempProcessedName = speakerName || "";
         let tempX = null, tempY = null, tempScale = null;
-        let expression = "";
 
         // --- 开始提取 <l> 标签 ---
         const regLoc = /<l\s*(-?\d+)\s*,\s*(-?\d+)(?:\s*,\s*(\d+(?:\.\d+)?))?>/i;
@@ -751,23 +765,15 @@
                 return ""; // 替换为空，即删除标签
             });
         }
-
-        // --- 开始提取 <e> 标签 ---
-        // 注意正则写得稍微宽容一点，防止有奇怪的空格
-        const regExp = /<(e.+?)>/i; 
-        if (regExp.test(tempProcessedName)) {
-            tempProcessedName = tempProcessedName.replace(regExp, (_, e) => {
-                expression = e.trim(); 
-                return ""; // 替换为空，即删除标签
-            });
-        }
         
         // --- 清理剩余残留和首尾空格 ---
         // 这一步得到的 cleanName 才是真正显示在名字框里的纯净名字
-        const cleanName = tempProcessedName.trim();
+        const _actor = this.getCurrentActorName(tempProcessedName);
+        const cleanName = _actor.name;
+        const expression = _actor.expression;
 
         // 2. 调用父类方法，把干净的名字传进去！(这是修复显示问题的关键)
-        _Game_Message_setSpeakerName.call(this, cleanName);
+        _Game_Message_setSpeakerName.call(this, cleanName.name);
 
         // 如果开关没开或系统隐藏，就不做立绘逻辑，但名字已经被净化了
         if ((switchId && !$gameSwitches.value(switchId)) || !$gameSystem._tachieVisible) return;
@@ -844,7 +850,7 @@
         let index = interpreter._index + 1; 
 
         const safeCodes = [
-            0, 118, 108, 408, 117, 121, 122, 123, 230, 231, 232, 234, 235,
+            102, 103, 104, 0, 118, 108, 408, 117, 121, 122, 123, 230, 231, 232, 234, 235,
             241, 245, 249, 250, 251, 205, 212, 213, 401, 402, 403, 404, 405, 357, 657, 505
         ];
 
@@ -852,8 +858,13 @@
             const cmd = list[index];
             const code = cmd.code;
 
-            if (code === 101) return true; // Show Text
-            if ([102, 103, 104].includes(code)) return true; // Choice/Input
+            if (code === 101) {
+                const _actor = $gameMessage.getCurrentActorName(cmd.parameters[4])
+                if (_actor.name == $gameSystem._currentSpeaker) {
+                    return true; // Show Text
+                }
+            }
+            // if ([102, 103, 104].includes(code)) return true; // Choice/Input
 
             if (safeCodes.includes(code)) {
                 index++;
@@ -952,5 +963,27 @@
         
         $gameSystem.setTachieAction(name, type, power, dur, freq);
     });
+
+    /** 插件外部接口 */
+    window.ShowAndHideALLPic = {
+        /** 
+         * 强制显示/隐藏立绘层容器 
+         * @param {boolean} isShow - true: 显示, false: 隐藏
+         */
+        hideAllTachie(isShow = false) {
+            // 1. 修改系统数据标志 (保证下一帧 update 时不会被改回去，且存档有效)
+            if ($gameSystem) {
+                $gameSystem._tachieVisible = isShow;
+            }
+
+            // 2. 立即操作当前场景的显示容器 (无需等待下一帧，实现瞬间消失/出现)
+            const scene = SceneManager._scene;
+            // 判断当前场景是否有 spriteset 和 tachieContainer
+            if (scene && scene._spriteset && scene._spriteset._tachieContainer) {
+                scene._spriteset._tachieContainer.visible = isShow;
+            }
+        }
+    };
+
 
 })();
