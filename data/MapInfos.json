@@ -55,8 +55,8 @@ null,
 {"id":53,"expanded":true,"name":"市场-地摊-1","order":11,"parentId":28,"scrollX":944,"scrollY":640,"quick":false},
 {"id":54,"expanded":true,"name":"市场-地摊-2","order":12,"parentId":28,"scrollX":954.5454545454546,"scrollY":538.9090909090909,"quick":false},
 {"id":55,"expanded":false,"name":"奥斯特城（演出2）","order":25,"parentId":2,"scrollX":1384.2857142857142,"scrollY":1034.5714285714284},
-{"id":56,"expanded":false,"name":"市场深处（演出2）","order":26,"parentId":2,"scrollX":1208,"scrollY":760}
+{"id":56,"expanded":false,"name":"市场深处（演出2）","order":26,"parentId":2,"scrollX":1208,"scrollY":760},
 {"id":57,"expanded":true,"name":"奥斯特城（仅用来生成截图）","order":28,"parentId":19,"scrollX":3500,"scrollY":1976},
-{"id":58,"expanded":true,"name":"不远处的山顶","order":31,"parentId":19,"scrollX":954.5454545454546,"scrollY":560.7272727272727}
-{"id":59,"expanded":true,"name":"市场-地摊-3","order":13,"parentId":28,"scrollX":832,"scrollY":624,"quick":false},
+{"id":58,"expanded":true,"name":"不远处的山顶","order":31,"parentId":19,"scrollX":954.5454545454546,"scrollY":560.7272727272727},
+{"id":59,"expanded":true,"name":"市场-地摊-3","order":13,"parentId":28,"scrollX":832,"scrollY":624,"quick":false}
 ]
