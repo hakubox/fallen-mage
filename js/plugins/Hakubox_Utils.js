@@ -846,7 +846,7 @@
       if (isCgMode) {
         SceneManager._scene._messageWindow.x = (Graphics.width - Graphics.boxWidth) / 2;
       } else {
-        SceneManager._scene._messageWindow.x = 0;
+        SceneManager._scene._messageWindow.x = 5;
       }
     }
     /**
