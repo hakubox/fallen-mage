@@ -747,7 +747,6 @@
         const pluginName = "ShowAndHideALLPic";
         const params = PluginManager.parameters(pluginName);
         const switchId = Number(params['SwitchId'] || 0);
-        const ignoreNames = (params['IgnoreNames'] || "").split(',').map(s => s.trim());
 
         // 临时变量用于提取
         let tempProcessedName = speakerName || "";
@@ -860,6 +859,9 @@
                 const _actor = $gameMessage.getCurrentActorName(cmd.parameters[4])
                 if (_actor.name == $gameSystem._currentSpeaker) {
                     return true; // Show Text
+                } else if (ignoreNames.includes(_actor.name)) {
+                    index++;
+                    continue;
                 }
             }
             // if ([102, 103, 104].includes(code)) return true; // Choice/Input

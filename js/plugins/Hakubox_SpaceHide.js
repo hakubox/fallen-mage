@@ -264,7 +264,7 @@
   };
 
   Window_Message.prototype.isHideTriggered = function () {
-    return Input.isTriggered('msgHide');
+    return Input.isTriggered('msgHide') || TouchInput.isCancelled();
   };
 
   // 控制提示窗口的逻辑
