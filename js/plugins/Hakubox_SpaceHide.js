@@ -250,7 +250,7 @@
     }
 
     // 2. 检测隐藏键 (空格)
-    if (this.isHideTriggered()) {
+    if (this.isHideTriggered() && (this._isMessageHiddenByToggle || (this.isOpen() && this.visible))) {
       this.toggleMessageVisibility();
       return true;
     }
