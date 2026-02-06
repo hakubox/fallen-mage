@@ -796,13 +796,41 @@
   // ** Scene_Map
   // ** 修正地图场景中Spine容器的层级
   //=============================================================================
-  const _Scene_Map_createDisplayObjects = Scene_Map.prototype.createDisplayObjects;
-  Scene_Map.prototype.createDisplayObjects = function () {
-    _Scene_Map_createDisplayObjects.call(this);
-    // 将Spine容器的层级移到 _spriteset (地图和角色层) 之上
-    if (this._spineBaseContainer) {
-      SceneManager._scene._spriteset.addChild(this._spineBaseContainer);
+  
+  function adjustSpineDepth(scene) {
+    // 确保容器存在
+    if (!scene._spineBaseContainer) return;
+    // 1. 确保它是 Scene 的直接子物体 (防止有什么其他插件把它拐跑了)
+    if (scene._spineBaseContainer.parent !== scene) {
+      scene.addChild(scene._spineBaseContainer);
     }
+    // 2. 把它插到 UI 层 (_windowLayer) 的屁股底下
+    if (scene._windowLayer) {
+      const index = scene.getChildIndex(scene._windowLayer);
+      if (index >= 0) {
+        // 插入到 WindowLayer 当前所在的索引，WindowLayer 就会自动往后挪一位
+        scene.addChildAt(scene._spineBaseContainer, index);
+      } else {
+        // 如果找不到 UI 层，就放最上面
+        scene.addChild(scene._spineBaseContainer);
+      }
+    } else {
+      scene.addChild(scene._spineBaseContainer);
+    }
+  }
+  
+  // 覆盖 Scene_Map 的创建 WindowLayer 方法
+  const _Scene_Map_createWindowLayer = Scene_Map.prototype.createWindowLayer;
+  Scene_Map.prototype.createWindowLayer = function() {
+    _Scene_Map_createWindowLayer.call(this); // 先创建 UI
+    adjustSpineDepth(this);                  // 再调整立绘位置
+  };
+
+  // 覆盖 Scene_Battle 的创建 WindowLayer 方法 (以防万一你也想在战斗中显示)
+  const _Scene_Battle_createWindowLayer = Scene_Battle.prototype.createWindowLayer;
+  Scene_Battle.prototype.createWindowLayer = function() {
+    _Scene_Battle_createWindowLayer.call(this);
+    adjustSpineDepth(this);
   };
 
   // #region Spine工具类

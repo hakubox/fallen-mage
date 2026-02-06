@@ -629,6 +629,9 @@
     // 3. 容器层: Spriteset_Base & Scene 控制
     // ==============================================================================
 
+    // ------------------------------------------------------------------------------
+    // 第一步：在 Spriteset 中只负责"创建对象"，绝对不要 addChild 到自身
+    // ------------------------------------------------------------------------------
     const _Spriteset_Base_createPictures = Spriteset_Base.prototype.createPictures;
     Spriteset_Base.prototype.createPictures = function() {
         _Spriteset_Base_createPictures.call(this);
@@ -636,18 +639,17 @@
     };
 
     Spriteset_Base.prototype.createTachieContainer = function() {
+        // 创建容器 Sprite，但不添加到 Spriteset 的显示列表中
         this._tachieContainer = new Sprite();
-        // 初始化 Sprite 容器
+        // 用于管理子立绘的字典
         this._tachieSprites = {};
-
-        // 如果层级模式是 BELOW (默认)，直接添加进 spriteset (在图片层之上，但在对话框等Window层之下)
-        if (layerPosition === 'BELOW') {
-            this.addChild(this._tachieContainer);
-        }
-        // 如果是 ABOVE，我们在 Scene 层级进行处理，这里只创建不添加，或者添加后移走
+        
+        // 【重要修改】：这里删除了原先所有的addChild逻辑。
+        // 现在 Spriteset 只持有这个容器的引用，但不负责渲染它。
+        // 渲染位置的控制权移交给 Scene_Map 和 Scene_Battle。
     };
 
-    // 在每一帧更新立绘内容
+    // 保持更新逻辑不变，因为 Spriteset 依然负责数据的计算
     const _Spriteset_Base_update = Spriteset_Base.prototype.update;
     Spriteset_Base.prototype.update = function() {
         _Spriteset_Base_update.call(this);
@@ -675,36 +677,80 @@
         this._tachieContainer.children.sort((a, b) => a.y - b.y);
     };
 
-    // --- 核心：处理图层覆盖 (ABOVE 模式) ---
-    // 我们需要在 WindowLayer 创建之后，把立绘容器放上去
-    
-    // Scene_Map
+    // ------------------------------------------------------------------------------
+    // 第二步：在 Scene (场景) 层级手动挂载容器
+    // 这样立绘就与 UI 同级，不再受 Spriteset (地图层) 的镜头缩放影响
+    // ------------------------------------------------------------------------------
+
+    // --- 地图场景 ---
     const _Scene_Map_createWindowLayer = Scene_Map.prototype.createWindowLayer;
     Scene_Map.prototype.createWindowLayer = function() {
+        // 1. 先创建 UI 层 (WindowLayer)
         _Scene_Map_createWindowLayer.call(this);
-        this.adjustTachieLayer();
+        // 2. 然后把立绘容器插进去
+        this.installTachieLayer();
     };
 
-    Scene_Map.prototype.adjustTachieLayer = function() {
+    Scene_Map.prototype.installTachieLayer = function() {
+        // 安全检查：确保 Spriteset 已经初始化且容器存在
+        if (!this._spriteset || !this._spriteset._tachieContainer) return;
+
+        const container = this._spriteset._tachieContainer;
+
+        // 防御性编程：如果它已经有父级（哪怕是错的），先移除
+        if (container.parent) container.parent.removeChild(container);
+
+        // 判断层级模式
         if (layerPosition === 'ABOVE') {
-            if (this._spriteset && this._spriteset._tachieContainer) {
-                // 把容器从 spriteset 拿出来，放到 Scene 的最上层 (WindowLayer 之后)
-                this.addChild(this._spriteset._tachieContainer);
+            // 【模式：覆盖 UI】
+            // 直接添加到 Scene 的最上层，这会盖住 createPictures 和 createWindowLayer 的所有内容
+            this.addChild(container);
+        } else {
+            // 【模式：标准 (对话框下方)】
+            // 目标：插入到 WindowLayer (对话框层) 的紧后面 (即下方)
+            // 此时 Scene 的 children 结构通常是: [Spriteset, WindowLayer, ...]
+            if (this._windowLayer) {
+                // 获取 WindowLayer 当前所在的索引
+                const index = this.getChildIndex(this._windowLayer);
+                // 把立绘容器插入到 WindowLayer 所在的那个位置
+                // 这样 WindowLayer 会被挤到 index+1，立绘就在它下面了
+                // 同时立绘在 Spriteset (通常 index 0) 之上
+                if (index >= 0) {
+                    this.addChildAt(container, index);
+                } else {
+                    // 如果找不到 WindowLayer（极少见），就直接 add，变成最上层
+                    this.addChild(container);
+                }
+            } else {
+                this.addChild(container);
             }
         }
     };
 
-    // Scene_Battle (同理)
+    // --- 战斗场景 (逻辑完全相同) ---
     const _Scene_Battle_createWindowLayer = Scene_Battle.prototype.createWindowLayer;
     Scene_Battle.prototype.createWindowLayer = function() {
         _Scene_Battle_createWindowLayer.call(this);
-        this.adjustTachieLayer();
+        this.installTachieLayer();
     };
 
-    Scene_Battle.prototype.adjustTachieLayer = function() {
+    Scene_Battle.prototype.installTachieLayer = function() {
+        if (!this._spriteset || !this._spriteset._tachieContainer) return;
+        const container = this._spriteset._tachieContainer;
+        if (container.parent) container.parent.removeChild(container);
+
         if (layerPosition === 'ABOVE') {
-            if (this._spriteset && this._spriteset._tachieContainer) {
-                this.addChild(this._spriteset._tachieContainer);
+            this.addChild(container);
+        } else {
+            if (this._windowLayer) {
+                const index = this.getChildIndex(this._windowLayer);
+                if (index >= 0) {
+                    this.addChildAt(container, index);
+                } else {
+                    this.addChild(container);
+                }
+            } else {
+                this.addChild(container);
             }
         }
     };
