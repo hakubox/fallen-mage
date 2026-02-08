@@ -64,6 +64,7 @@ null,
 {"id":62,"expanded":true,"name":"魔法道具店-传送-3","order":16,"parentId":28,"scrollX":875,"scrollY":486},
 {"id":63,"expanded":true,"name":"奥斯特城-阿乌拉-1-1","order":17,"parentId":28,"scrollX":1207.7142857142856,"scrollY":760.2857142857142},
 {"id":64,"expanded":true,"name":"酒馆-阿乌拉-1-2","order":18,"parentId":28,"scrollX":1166.6666666666667,"scrollY":658.6666666666666},
-{"id":65,"expanded":true,"name":"奥斯特城-开大车-1","order":19,"parentId":28,"scrollX":832,"scrollY":782},
-{"id":66,"expanded":true,"name":"奥斯特城-开大车-2","order":20,"parentId":28,"scrollX":1166.6666666666667,"scrollY":658.6666666666666}
+{"id":65,"expanded":true,"name":"奥斯特城-开大车-1","order":19,"parentId":28,"scrollX":1177.3333333333333,"scrollY":781.3333333333334},
+{"id":66,"expanded":true,"name":"奥斯特城-开大车-2","order":20,"parentId":28,"scrollX":832,"scrollY":782},
+{"id":67,"expanded":true,"name":"奥斯特城-开大车-3","order":21,"parentId":28,"scrollX":832,"scrollY":782}
 ]
