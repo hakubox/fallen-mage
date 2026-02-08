@@ -237,27 +237,37 @@
     this._hideHintWindow = win;
   };
 
+  // 【新增】辅助函数：检查是否有子窗口（选项、数值、物品）正在激活
+  // 如果这些窗口激活中，说明现在需要玩家交互，不能隐藏
+  Window_Message.prototype.isAnySubWindowActive = function () {
+    return (this._choiceListWindow && this._choiceListWindow.active) ||
+      (this._numberWindow && this._numberWindow.active) ||
+      (this._eventItemWindow && this._eventItemWindow.active);
+  };
+
   // 核心：重写输入更新逻辑
   const _Window_Message_updateInput = Window_Message.prototype.updateInput;
   Window_Message.prototype.updateInput = function () {
 
-    // 1. 检查总功能开关
-    if (enableSwitchId > 0 && !$gameSwitches.value(enableSwitchId)) {
-      if (this._isMessageHiddenByToggle) {
-        this.toggleMessageVisibility();
+    if (!this.isAnySubWindowActive()) {
+      // 1. 检查总功能开关
+      if (enableSwitchId > 0 && !$gameSwitches.value(enableSwitchId)) {
+        if (this._isMessageHiddenByToggle) {
+          this.toggleMessageVisibility();
+        }
+        return _Window_Message_updateInput.call(this);
       }
-      return _Window_Message_updateInput.call(this);
-    }
 
-    // 2. 检测隐藏键 (空格)
-    if (this.isHideTriggered() && (this._isMessageHiddenByToggle || (this.isOpen() && this.visible))) {
-      this.toggleMessageVisibility();
-      return true;
-    }
+      // 2. 检测隐藏键 (空格)
+      if (this.isHideTriggered() && (this._isMessageHiddenByToggle || (this.isOpen() && this.visible))) {
+        this.toggleMessageVisibility();
+        return true;
+      }
 
-    // 3. 如果隐藏中，阻断一切输入
-    if (this._isMessageHiddenByToggle) {
-      return true;
+      // 3. 如果隐藏中，阻断一切输入
+      if (this._isMessageHiddenByToggle) {
+        return true;
+      }
     }
 
     return _Window_Message_updateInput.call(this);

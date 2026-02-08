@@ -63,55 +63,73 @@
  * @parent through
  * @text 阻挡玩家的ID
  * @desc 定义哪个Region ID可以阻挡玩家,默认0,即所有RegionID均不阻挡,以下同理。
- * @type number
+ * @type number[]
  * @min 0
  * @max 255
- * @default 0
+ * @default []
  *
  * @param eventRestrict
  * @parent through
  * @text 阻挡事件的ID
  * @desc 定义可以阻挡事件穿越或发生的Region ID,比如阻挡正在跟随玩家的NPC移动事件。
- * @type number
+ * @type number[]
  * @min 0
  * @max 255
- * @default 0
+ * @default []
  *
  * @param allRestrict
  * @parent through
  * @text 阻挡一切的ID
  * @desc 定义可以同时阻挡玩家和事件的regionID
- * @type number
+ * @type number[]
  * @min 0
  * @max 255
- * @default 0
+ * @default []
  *
  * @param playerAllow
  * @parent through
  * @text 放行玩家的ID
  * @desc 定义一个总是可以让玩家穿越的regionID,这个通常被用来做机关暗道使用。
- * @type number
+ * @type number[]
  * @min 0
  * @max 255
- * @default 0
+ * @default []
  *
  * @param eventAllow
  * @parent through
  * @text 放行事件的ID
  * @desc 定义总是允许事件发生和穿过的regionID
- * @type number
+ * @type number[]
  * @min 0
  * @max 255
- * @default 0
+ * @default []
  *
  * @param allAllow
  * @parent through
  * @text 放行一切的ID
  * @desc 定义总是允许玩家和事件穿过的regionID
- * @type number
+ * @type number[]
  * @min 0
  * @max 255
- * @default 0
+ * @default []
+ *
+ * @param alwaysAbove
+ * @parent through
+ * @text 上层显示区域ID (星号效果)
+ * @desc 标记为该区域ID的图块将始终覆盖在行走图上方。设为 0 禁用。
+ * @type number[]
+ * @min 0
+ * @max 255
+ * @default []
+ *
+ * @param alwaysBelow
+ * @parent through
+ * @text 下层显示区域ID (普通地面)
+ * @desc 标记为该区域ID的图块将始终显示在行走图下方。设为 0 禁用。
+ * @type number[]
+ * @min 0
+ * @max 255
+ * @default []
  * 
  * @param special
  * @text ————— 特殊图块配置 —————
@@ -394,6 +412,14 @@
   // #endregion
 
   const typeDefine = {
+    playerRestrict: ["number"],
+    eventRestrict: ["number"],
+    allRestrict: ["number"],
+    playerAllow: ["number"],
+    eventAllow: ["number"],
+    allAllow: ["number"],
+    alwaysAbove: ["number"],
+    alwaysBelow: ["number"],
     specialList: []
   };
 
@@ -411,21 +437,170 @@
   const RREventAllow = params.eventAllow;
   /** 总是可以让玩家和事件穿越的地图块 */
   const RRAllAllow = params.allAllow;
+  /** 放在行走图上方的地图块 */
+  const RRAlwaysAbove = params.alwaysAbove;
+  /** 放在行走图下方的地图块 */
+  const RRAlwaysBelow = params.alwaysBelow;
 
   /** 特殊地块列表 */
   const specialRegionList = params.specialList;
 
-  
+
+
+  const _Tilemap_addSpot = Tilemap.prototype._addSpot;
+  Tilemap.prototype._addSpot = function (startX, startY, x, y) {
+    // 计算当前格子在地图上的真实坐标
+    // startX/Y 是视口起始点，x/y 是相对于视口的偏移
+    this._hack_currentMapX = startX + x;
+    this._hack_currentMapY = startY + y;
+
+    // 调用原函数，原函数内部会调用 _isHigherTile
+    _Tilemap_addSpot.call(this, startX, startY, x, y);
+
+    // 清理变量（可选，为了整洁）
+    this._hack_currentMapX = undefined;
+    this._hack_currentMapY = undefined;
+  };
+
+  // -------------------------------------------------------------------------
+  // 2. Hook _isHigherTile
+  // 这是 MZ 判断图块应该放在“上层图层”还是“下层图层”的逻辑
+  // -------------------------------------------------------------------------
+  const _Tilemap_isHigherTile = Tilemap.prototype._isHigherTile;
+  Tilemap.prototype._isHigherTile = function (tileId) {
+    // 1. 获取图块原本的层级属性 (根据数据库里的星号设置)
+    const isHigh = _Tilemap_isHigherTile.call(this, tileId);
+    // 2. 检查是否有 Region ID 覆盖
+    // 确保我们拿到了坐标，并且 _readMapData 函数存在
+    if (this._hack_currentMapX !== undefined && this._readMapData) {
+
+      // _readMapData(x, y, z) 中：z=5 对应 Region ID 层
+      const rId = this._readMapData(this._hack_currentMapX, this._hack_currentMapY, 5);
+
+      if (rId > 0) {
+        // 强制设为上层 (星号效果)
+        if (RRAlwaysAbove.includes(rId)) {
+          return true;
+        }
+        // 强制设为下层 (取消星号效果)
+        if (RRAlwaysBelow.includes(rId)) {
+          return false;
+        }
+      }
+    }
+
+    // 3. 如果没有命中区域规则，返回原始设定
+    return isHigh;
+  };
+
+
   // #region CharacterBase
 
-  const Game_CharacterBase_isMapPassable = Game_CharacterBase.prototype.isMapPassable;
-  Game_CharacterBase.prototype.isMapPassable = function (x, y, d) {
-    if (this.isEventRegionForbid(x, y, d)) return false;
-    if (this.isPlayerRegionForbid(x, y, d)) return false;
-    if (this.isEventRegionAllow(x, y, d)) return true;
-    if (this.isPlayerRegionAllow(x, y, d)) return true;
-    return Game_CharacterBase_isMapPassable.call(this, x, y, d);
+  // #region CharacterBase
+
+  /* 
+   * 修复核心逻辑：
+   * 1. 优先检查 Region 强制阻挡/放行。
+   * 2. 如果没有 Region 规则，检查地形通行度。
+   * 3. 关键修复：允许从“不可通行区域”走向“可通行区域”。
+   */
+  const _Game_CharacterBase_canPass = Game_CharacterBase.prototype.canPass;
+  Game_CharacterBase.prototype.canPass = function (x, y, d) {
+    const x2 = $gameMap.roundXWithDirection(x, d);
+    const y2 = $gameMap.roundYWithDirection(y, d);
+
+    // 1. 【最高优先级】强制阻挡
+    // 检查目标点 (x2, y2) 是否被 Region 禁止
+    if (this.isRegionForbid(x2, y2)) {
+      return false;
+    }
+
+    // 2. 【次高优先级】强制放行
+    // 检查目标点 (x2, y2) 是否被 Region 允许
+    if (this.isRegionAllow(x2, y2)) {
+      // 虽说是放行，但不能穿人（除非穿透模式）
+      if (!this.isThrough() && this.isCollidedWithCharacters(x2, y2)) {
+        return false;
+      }
+      return true;
+    }
+
+    // 3. 【原生逻辑修正】
+    // 默认的 canPass 会检查 "当前格子(x,y) 是否允许离开"。
+    // 当角色卡在墙里时，这一步会返回 false。
+    // 我们必须手动检查 "目标格子(x2,y2) 是否允许进入"。
+    // 如果目标允许进入，且没有被 Region 阻挡，我们就允许移动。
+
+    if (!$gameMap.isValid(x2, y2)) {
+      return false;
+    }
+    
+    // 检查目标格子的地形通行度 (不检查当前格子的离开权限)
+    if (this.isMapPassable(x2, y2, d)) {
+      // 再次确认没有撞到人
+      if (this.isThrough() || !this.isCollidedWithCharacters(x2, y2)) {
+         return true; 
+      }
+    }
+
+    // 4. 兜底逻辑：处理其他情况（如载具、事件特殊状态）
+    return _Game_CharacterBase_canPass.call(this, x, y, d);
   };
+
+  /*
+   * 必须保留 isMapPassable 的修改，
+   * 确保通行度检查受到 Region 的影响。
+   */
+  const _Game_CharacterBase_isMapPassable = Game_CharacterBase.prototype.isMapPassable;
+  Game_CharacterBase.prototype.isMapPassable = function (x, y, d) {
+    // 这里的 x, y 是目标坐标，d 是进入方向
+    
+    // 1. 如果目标被 Region 禁止，视为墙壁
+    if (this.isRegionForbid(x, y)) return false;
+    
+    // 2. 如果目标被 Region 允许，视为通路
+    if (this.isRegionAllow(x, y)) return true;
+    
+    // 3. 否则读取原生图块设置 (O/X)
+    // 这里调用原生函数，它会正确处理图块的 O/X 设置
+    return _Game_CharacterBase_isMapPassable.call(this, x, y, d);
+  };
+
+  // --- 辅助判断函数 ---
+
+  Game_CharacterBase.prototype.isRegionForbid = function (x, y) {
+    if (this.isThrough()) return false; // 穿透模式无视阻挡
+    const regionId = $gameMap.regionId(x, y);
+
+    if (regionId === 0) return false;
+    if (RRAllRestrict.includes(regionId)) return true;
+
+    if (this.isPlayer) {
+      return RRPlayerRestrict.includes(regionId);
+    } else { 
+      return RREventRestrict.includes(regionId);
+    }
+  };
+
+  Game_CharacterBase.prototype.isRegionAllow = function (x, y) {
+    const regionId = $gameMap.regionId(x, y);
+
+    if (regionId === 0) return false;
+    if (RRAllAllow.includes(regionId)) return true;
+
+    if (this.isPlayer) {
+      return RRPlayerAllow.includes(regionId);
+    } else { 
+      return RREventAllow.includes(regionId);
+    }
+  };
+
+  // 标志位
+  Game_CharacterBase.prototype.isPlayer = false;
+  Game_Event.prototype.isEvent = true;
+  Game_Player.prototype.isPlayer = true;
+
+  // #endregion
 
   Game_CharacterBase.prototype.isEventRegionForbid = function (x, y, d) {
     if (this.isPlayer) return false;
@@ -433,8 +608,8 @@
     let regionId = this.getRegionId(x, y, d);
     if (regionId === 0) return false;
     // if ($gameMap.restrictEventRegions().contains(regionId)) return true;
-    if (regionId === RRAllRestrict) return true;
-    return regionId === RREventRestrict;
+    if (RRAllRestrict.includes(regionId)) return true;
+    return RREventRestrict.includes(regionId);
   };
 
   Game_CharacterBase.prototype.isPlayerRegionForbid = function (x, y, d) {
@@ -443,8 +618,8 @@
     let regionId = this.getRegionId(x, y, d);
     if (regionId === 0) return false;
     // if ($gameMap.restrictPlayerRegions().contains(regionId)) return true;
-    if (regionId === RRAllRestrict) return true;
-    return regionId === RRPlayerRestrict;
+    if (RRAllRestrict.includes(regionId)) return true;
+    return RRPlayerRestrict.includes(regionId);
   };
 
   Game_CharacterBase.prototype.isEventRegionAllow = function (x, y, d) {
@@ -452,8 +627,8 @@
     let regionId = this.getRegionId(x, y, d);
     if (regionId === 0) return false;
     // if ($gameMap.allowEventRegions().contains(regionId)) return true;
-    if (regionId === RRAllAllow) return true;
-    return regionId === RREventAllow;
+    if (RRAllAllow.includes(regionId)) return true;
+    return RREventAllow.includes(regionId);
   };
 
   Game_CharacterBase.prototype.isPlayerRegionAllow = function (x, y, d) {
@@ -461,8 +636,8 @@
     let regionId = this.getRegionId(x, y, d);
     if (regionId === 0) return false;
     // if ($gameMap.allowPlayerRegions().contains(regionId)) return true;
-    if (regionId === RRAllAllow) return true;
-    return regionId === RRPlayerAllow;
+    if (RRAllAllow.includes(regionId)) return true;
+    return RRPlayerAllow.includes(regionId);
   };
 
   Game_CharacterBase.prototype.getRegionId = function (x, y, d) {
@@ -540,7 +715,7 @@
     },
     no: {
       frameCount: 1,
-      update() {}
+      update() { }
     },
     /** 呼吸效果 */
     breath: {
@@ -578,7 +753,7 @@
         specialInfo.isShowComplete = true;
         specialInfo.maskFrameIndex = 0;
       }
-      
+
     } else if (specialInfo.isStartMask && specialInfo.isShowComplete && specialInfo.isCanHide) {
       const _effect = maskEffects['hide'];
 
@@ -592,7 +767,7 @@
         specialInfo.isCanHide = false;
         SceneManager._scene.removeChild(specialInfo.maskSprite);
       }
-      
+
     } else if (specialInfo.isStartMask && specialInfo.isShowComplete) {
       const _effect = maskEffects[specialInfo.maskEffect];
 
@@ -602,7 +777,7 @@
       if (specialInfo.maskFrameIndex >= _effect.frameCount) {
         specialInfo.maskFrameIndex = 0;
       }
-      
+
     }
   }
 
@@ -644,7 +819,7 @@
         $gamePlayer.setMoveSpeed(specialInfo.prevMoveSpeed);
         specialInfo.prevMoveSpeed = $gamePlayer.moveSpeed();
       }
-      
+
       if (specialInfo.isStartMask && SceneManager._scene instanceof Scene_Map) {
         if (specialInfo.isStartMask) {
           specialInfo.maskFrameIndex = 0;
@@ -677,7 +852,7 @@
           } else {
             _actor.gainHp(Math.floor(-_regionInfo.hurtHP));
           }
-          
+
           if (_actor.hp <= 0) {
             if (!_regionInfo.canDie) {
               if (_actor._hp === 0) {
