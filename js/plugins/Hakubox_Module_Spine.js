@@ -1049,7 +1049,7 @@
             _skins = `sex/absorb,sex/t${_colorIndex + 1}`;
             break;
           case 'rub_breasts': // 揉双乳
-            _skins = `sex/rub,sex/hl${_colorIndex || ''},sex/hr1${_colorIndex + 1}`;
+            _skins = `sex/rub,sex/hl${_colorIndex || ''},sex/hr1${4 - _colorIndex}`;
             break;
           default:
             break;
@@ -1066,7 +1066,7 @@
             _skins = `sex/absorbe1,sex/t${_colorIndex + 1}`;
             break;
           case 'rub_breasts': // 揉双乳
-            _skins = `sex/rub1,sex/hl${_colorIndex || ''},sex/hr1${_colorIndex + 1}`;
+            _skins = `sex/rub1,sex/hl${_colorIndex || ''},sex/hr1${4 - _colorIndex}`;
             break;
           default:
             break;

@@ -201,12 +201,12 @@
     });
 
     //脚本型
-    Game_Screen.prototype.showPictureFadeInOut = function (file, id, x, y) {
+    Game_Screen.prototype.showPictureFadeInOut = function (file, id, x, y, zoom = 0) {
         const pictureId = id
 
         // 创建并开始效果
         const effect = new PictureFadeEffect(
-            id, file, x, y, 60, 0, 60, 30, 40
+            id, file, x, y, 60, 0, 60, zoom || 30, zoom || 40
         );
 
         // 如果已有相同ID的效果，先移除
@@ -218,7 +218,7 @@
         effect.start();
     }
 
-        // -------------------------------------------------------------------------
+    // -------------------------------------------------------------------------
     // 修复后的代码块
     // -------------------------------------------------------------------------
 
