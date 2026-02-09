@@ -112,6 +112,20 @@
  * @min 0
  * @max 255
  * @default []
+ * 
+ * @param allowThroughEvent
+ * @parent through
+ * @text Region放行时穿透事件
+ * @desc 开启后，在“放行玩家的ID”或“放行一切的ID”区域内，玩家可以穿过原本阻挡的事件（NPC），默认为关闭。
+ * @type switch
+ * @default 0
+ * 
+ * @param strictExitCheck
+ * @parent through
+ * @text 严格离开检测
+ * @desc 开启后，从“强制放行区域”走向“普通不通行区域”（如墙壁）时会被阻挡。关闭则可能因为当前格子可通行而走进墙里，默认为开启。
+ * @type switch
+ * @default 0
  *
  * @param alwaysAbove
  * @parent through
@@ -441,6 +455,21 @@
   const RRAlwaysAbove = params.alwaysAbove;
   /** 放在行走图下方的地图块 */
   const RRAlwaysBelow = params.alwaysBelow;
+  
+  /** Region放行时是否允许穿透事件 */
+  const RRAllowThroughEvent = params.allowThroughEvent;
+  const getRRAllowThroughEvent = () => {
+    if (!$gameSwitches) return false;
+    if (!RRAllowThroughEvent) return false;
+    return $gameSwitches.value(RRAllowThroughEvent);
+  }
+  /** 是否开启严格离开检测 */
+  const RRStrictExitCheck = params.strictExitCheck;
+  const getRRStrictExitCheck = () => {
+    if (!$gameSwitches) return true;
+    if (!RRStrictExitCheck) return true;
+    return $gameSwitches.value(RRStrictExitCheck);
+  }
 
   /** 特殊地块列表 */
   const specialRegionList = params.specialList;
@@ -500,51 +529,63 @@
 
   /* 
    * 修复核心逻辑：
-   * 1. 优先检查 Region 强制阻挡/放行。
-   * 2. 如果没有 Region 规则，检查地形通行度。
-   * 3. 关键修复：允许从“不可通行区域”走向“可通行区域”。
+   * 1. 优先检查 Region 强制阻挡。
+   * 2. 检查 Region 强制放行（增加穿透事件开关判断）。
+   * 3. 严格离开检测：从 R图块 走出时，检查目标图块是否可行。
    */
   const _Game_CharacterBase_canPass = Game_CharacterBase.prototype.canPass;
   Game_CharacterBase.prototype.canPass = function (x, y, d) {
     const x2 = $gameMap.roundXWithDirection(x, d);
     const y2 = $gameMap.roundYWithDirection(y, d);
-
     // 1. 【最高优先级】强制阻挡
     // 检查目标点 (x2, y2) 是否被 Region 禁止
-    if (this.isRegionForbid(x2, y2)) {
-      return false;
+    if (this.isRegionForbid(x2, y2) || this.isRegionForbid(x, y)) {
+      // 注意：通常我们只关心目标点是否被禁，但如果当前点被禁(比如被事件强制传送进去)，也应该很难移动（也就是所谓的不让出）
+      // 这里主要维持原逻辑，重点检查 x2, y2
+       if (this.isRegionForbid(x2, y2)) return false;
     }
 
-    // 2. 【次高优先级】强制放行
+    // 2. 【次高优先级】强制放行 Region 判断
     // 检查目标点 (x2, y2) 是否被 Region 允许
-    if (this.isRegionAllow(x2, y2)) {
-      // 虽说是放行，但不能穿人（除非穿透模式）
-      if (!this.isThrough() && this.isCollidedWithCharacters(x2, y2)) {
+    const isTargetRegionAllow = this.isRegionAllow(x2, y2);
+    
+    if (isTargetRegionAllow) {
+      // 需求1：穿透事件开关 (allowThroughEvent)
+      // 如果不允许穿透事件，且不是穿透模式，且目标点有碰撞，则禁止通行
+      if (!getRRAllowThroughEvent() && !this.isThrough() && this.isCollidedWithCharacters(x2, y2)) {
         return false;
       }
       return true;
     }
-
-    // 3. 【原生逻辑修正】
-    // 默认的 canPass 会检查 "当前格子(x,y) 是否允许离开"。
-    // 当角色卡在墙里时，这一步会返回 false。
-    // 我们必须手动检查 "目标格子(x2,y2) 是否允许进入"。
-    // 如果目标允许进入，且没有被 Region 阻挡，我们就允许移动。
-
-    if (!$gameMap.isValid(x2, y2)) {
-      return false;
-    }
     
-    // 检查目标格子的地形通行度 (不检查当前格子的离开权限)
-    if (this.isMapPassable(x2, y2, d)) {
-      // 再次确认没有撞到人
-      if (this.isThrough() || !this.isCollidedWithCharacters(x2, y2)) {
-         return true; 
+    // 3. 【需求2：严格离开检测】
+    // 只有当“开启了严格开关”且“目标不是强制放行区”时执行
+    if (getRRStrictExitCheck()) {
+      if (!this.isNativelyEnterable(x2, y2, d)) {
+        return false;
       }
     }
 
-    // 4. 兜底逻辑：处理其他情况（如载具、事件特殊状态）
+    // 4. 【原生逻辑】
+    // 调用原版逻辑处理普通地形、载具等
+    // 原版逻辑：return this.isMapPassable(x, y, d) && !this.isCollidedWithCharacters(x2, y2);
     return _Game_CharacterBase_canPass.call(this, x, y, d);
+  };
+
+  /**
+   * 判断目标格子是否“原生”允许进入（忽略本插件的 Region 影响）
+   * @param {number} x - 目标 X
+   * @param {number} y - 目标 Y
+   * @param {number} d - 移动方向 (2,4,6,8)
+   */
+  Game_CharacterBase.prototype.isNativelyEnterable = function(x, y, d) {
+    if (!$gameMap.isValid(x, y)) return false;
+    
+    // 所谓“进入(Enter)”，在 RPG Maker 底层等同于“该格子允许从反方向(leaving)通行”。
+    // 例如：我想向下(2)走进墙里，就要问墙：你允许上方(8)通行吗？
+    // this.reverseDir(d) 是引擎自带方法，比写 10-d 更直观。
+    // $gameMap.isPassable 读取的是最原始的图块数据(O/X/方向控制)。
+    return $gameMap.isPassable(x, y, this.reverseDir(d));
   };
 
   /*
@@ -553,7 +594,7 @@
    */
   const _Game_CharacterBase_isMapPassable = Game_CharacterBase.prototype.isMapPassable;
   Game_CharacterBase.prototype.isMapPassable = function (x, y, d) {
-    // 这里的 x, y 是目标坐标，d 是进入方向
+    // 这里的 x, y 是检测的目标坐标（在 canPass 内部调用时通常传 x,y 是当前坐标，但 isMapPassable 定义上是检测某坐标的可行性）
     
     // 1. 如果目标被 Region 禁止，视为墙壁
     if (this.isRegionForbid(x, y)) return false;
@@ -562,39 +603,39 @@
     if (this.isRegionAllow(x, y)) return true;
     
     // 3. 否则读取原生图块设置 (O/X)
-    // 这里调用原生函数，它会正确处理图块的 O/X 设置
     return _Game_CharacterBase_isMapPassable.call(this, x, y, d);
   };
-
   // --- 辅助判断函数 ---
-
+  
+  // 新增：检查原始地图数据的通行度（忽略 Region 插件的影响）
+  // 用于“严格离开检测”功能，防止从 R 图块随意走到墙里
+  Game_CharacterBase.prototype.isOriginalMapPassable = function(x, y, d) {
+      // 这里调用 core 脚本中 Game_Map.prototype.isPassable 的类似逻辑
+      // 也就是直接查图块 flag，不经过 this.isRegionAllow 的干扰
+      return $gameMap.isPassable(x, y, d);
+  };
   Game_CharacterBase.prototype.isRegionForbid = function (x, y) {
     if (this.isThrough()) return false; // 穿透模式无视阻挡
     const regionId = $gameMap.regionId(x, y);
-
     if (regionId === 0) return false;
     if (RRAllRestrict.includes(regionId)) return true;
-
     if (this.isPlayer) {
       return RRPlayerRestrict.includes(regionId);
     } else { 
       return RREventRestrict.includes(regionId);
     }
   };
-
   Game_CharacterBase.prototype.isRegionAllow = function (x, y) {
     const regionId = $gameMap.regionId(x, y);
-
     if (regionId === 0) return false;
     if (RRAllAllow.includes(regionId)) return true;
-
     if (this.isPlayer) {
       return RRPlayerAllow.includes(regionId);
     } else { 
+      // 对于事件，暂时保持原样，如果有特殊需求可以扩展
       return RREventAllow.includes(regionId);
     }
   };
-
   // 标志位
   Game_CharacterBase.prototype.isPlayer = false;
   Game_Event.prototype.isEvent = true;

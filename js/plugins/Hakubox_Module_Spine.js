@@ -643,11 +643,17 @@
 
   Scene_Base.prototype.createSpineLayerContainers = function () {
     this._spineBaseContainer = new PIXI.Container();
+
     this._spineBaseContainer.visible = false;
     this.addChild(this._spineBaseContainer);
 
     this._spineBackgroundContainer = new PIXI.Container();
     this._spineContainer = new PIXI.Container();
+    this._spineContainer._brightnessFilter = new PIXI.filters.ColorMatrixFilter();
+    // 将滤镜应用到容器
+    this._spineContainer.filters = [this._spineContainer._brightnessFilter];
+    // 记录当前亮度 (1.0 = 正常, 0.0 = 全黑)
+    this._spineContainer._currentVal = 1.0;
     this._spineForegroundContainer = new PIXI.Container();
     this._spineBaseContainer.addChild(
       this._spineBackgroundContainer, 
@@ -659,13 +665,42 @@
   const _Scene_Base_update = Scene_Base.prototype.update;
   Scene_Base.prototype.update = function () {
     _Scene_Base_update.call(this);
+    
+    // 原有的补间动画逻辑
     if (this._spineTweenManager) {
       this._spineTweenManager.update();
     }
+    
+    // 原有的可见性开关逻辑
     if (this._spineBaseContainer) {
       if (this._spineBaseContainer.visible !== $gameSwitches.value(defaultVisibleSwitchId)) {
         this._spineBaseContainer.visible = $gameSwitches.value(defaultVisibleSwitchId);
       }
+      
+      // ———————————————— 新增：极简版变暗逻辑 ————————————————
+      // 选择你要变色的容器：
+      // this._spineContainer     = 只有立绘变黑（推荐）
+      // this._spineBaseContainer = 连背景图层一起变黑
+      const targetContainer = this._spineContainer; 
+      if (targetContainer && $gameSystem) {
+        // B. 设定目标亮度
+        // 逻辑：如果是菲伦说话，变暗(比如0.4)；否则恢复正常(1.0)
+        const isFern = (!$gameSystem._currentSpeaker || $gameSystem._currentSpeaker === '菲伦');
+        const targetVal = isFern ? 1.0 : 0.4; 
+        // 注：0.4 是暗度，你可以改成 0.5 或 0.3，越小越黑
+
+        // C. 平滑过渡 (每帧逼近目标值)
+        const speed = 0.1; // 变化速度 (0.01~1.0)，越大越快
+        const diff = targetVal - targetContainer._currentVal;
+        // 只有当有明显差异时才计算，节省性能
+        // 只有当有明显差异时才计算，节省性能
+        if (Math.abs(diff) > 0.005) {
+          targetContainer._currentVal += diff * speed;
+          // 应用亮度 (brightness方法: 1为原色，0为黑，>1为爆亮)
+          targetContainer._brightnessFilter.brightness(targetContainer._currentVal, false);
+        }
+      }
+      // ————————————————————————————————————————————————————
     }
   };
 
