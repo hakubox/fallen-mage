@@ -685,9 +685,8 @@
       if (targetContainer && $gameSystem) {
         // B. 设定目标亮度
         // 逻辑：如果是菲伦说话，变暗(比如0.4)；否则恢复正常(1.0)
-        const isFern = (!$gameSystem._currentSpeaker || $gameSystem._currentSpeaker === '菲伦');
-        const targetVal = isFern ? 1.0 : 0.4; 
-        // 注：0.4 是暗度，你可以改成 0.5 或 0.3，越小越黑
+        const isCurrent = ($gameSystem._tachieVisible && (!$gameSystem._currentSpeaker || $gameSystem._currentSpeaker === '菲伦'));
+        const targetVal = isCurrent ? 1.0 : 0.4; 
 
         // C. 平滑过渡 (每帧逼近目标值)
         const speed = 0.1; // 变化速度 (0.01~1.0)，越大越快
