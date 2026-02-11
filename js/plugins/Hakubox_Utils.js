@@ -822,7 +822,34 @@
   };
   // #endregion
 
-  
+  // 劫持 RPG Maker 计算选择框 X 坐标的方法
+  Window_ChoiceList.prototype.windowX = function () {
+    const msgWindow = SceneManager._scene._messageWindow;
+    if (!msgWindow) return 0;
+
+    const position = $gameMessage.choicePositionType();
+
+    // 【核心修复】使用 this.windowWidth() 而不是 this.width
+    // windowWidth() 会预先计算出内容需要的宽度
+    const choiceWidth = this.windowWidth();
+
+    switch (position) {
+      case 0: // 左对齐
+        return msgWindow.x;
+
+      case 1: // 居中
+        // 公式：消息窗口X + (消息窗口宽 - 选项框宽) / 2
+        return msgWindow.x + (msgWindow.width - choiceWidth) / 2;
+
+      case 2: // 右对齐
+        // 公式：消息窗口X + 消息窗口宽 - 选项框宽
+        return msgWindow.x + msgWindow.width - choiceWidth;
+    }
+
+    return 0;
+  };
+
+
   // #region 工具类
   /** 工具类 */
   class HakuboxUtils {
@@ -895,7 +922,7 @@
   window.HakuboxUtils = HakuboxUtils;
   // #endregion
 
-  
+
   PluginManager.registerCommand(PluginName, "changeCgMode", args => {
     const isCgMode = args.isCgMode === "true";
     HakuboxUtils.changeCgMode(isCgMode);
