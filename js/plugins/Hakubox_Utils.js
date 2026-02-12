@@ -99,9 +99,29 @@
  * @desc 缓存图片列表，图片间使用换行分隔，注意需要将Community_Basic插件中的cacheLimit缓存调整到合适的大小。
  * @type note
  * 
+ * 
+ * @param titleLabel
+ * @parent general
+ * @text ———— 标题页标签 ————
+ * 
+ * @param titleVisible
+ * @parent titleLabel
+ * @text 菜单是否显示
+ * @desc 菜单是否显示
+ * @type boolean
+ * @default true
+ * 
+ * 
  * @param titleMenu
  * @parent general
  * @text ———— 标题菜单 ————
+ * 
+ * @param titleMenuVisible
+ * @parent titleMenu
+ * @text 菜单是否显示
+ * @desc 菜单是否显示
+ * @type boolean
+ * @default true
  * 
  * @param titleMenuX
  * @parent titleMenu
@@ -136,6 +156,7 @@
  * @option 右对齐
  * @value right
  * @default left
+ * 
  * 
  * @param volume
  * @parent general
@@ -768,6 +789,13 @@
 
 
   // #region 标题菜单相关
+  
+  const Scene_Title_createCommandWindow = Scene_Title.prototype.createCommandWindow;
+  Scene_Title.prototype.createCommandWindow = function() {
+    Scene_Title_createCommandWindow.call(this);
+    this._commandWindow.visible = params.titleMenuVisible == undefined ? true : params.titleMenuVisible;
+    this._gameTitleSprite.visible = params.titleVisible == undefined ? true : params.titleVisible;
+  };
 
   Window_TitleCommand.prototype.updatePlacement = function () {
     this.x = params.titleMenuX || (Graphics.boxWidth - this.width) / 2;
