@@ -1,21 +1,61 @@
 //=============================================================================
-// ** RPG Maker MZ - Hakubox_Scene_Game.js
+// ** RPG Maker MZ - Hakubox_SysCore.js
 //=============================================================================
 
 // #region 脚本注释
 /*:
- * @plugindesc 定制场景 - Game场景 (v1.0.0)
+ * @plugindesc 白箱RM核心插件
  * @version 1.0.0
  * @author hakubox
  * @email hakubox@outlook.com
  * @target MZ
  * 
  * @help
- * 【与傲娇妹妹的治愈日常】定制插件。
+ * 白箱核心插件。
+ * 
+ * 
+ * @param version
+ * @text ———— 版本号 ————
+ * @default ——————————————
+ * 
+ * @param versionNo
+ * @parent version
+ * @text 当前游戏版本号
+ * @desc 当前游戏版本号，不要带上v或者version前缀。 (例如：1.0.0)
+ * @type text
+ * 
+ * @param versionLabelX
+ * @parent version
+ * @text 版本号X轴
+ * @desc 版本号X轴
+ * @type number
+ * @min 0
+ * @max 99999
+ * 
+ * @param versionLabelY
+ * @parent version
+ * @text 版本号Y轴
+ * @desc 版本号Y轴
+ * @type number
+ * @min 0
+ * @max 99999
+ * 
+ * @param versionAlign
+ * @parent version
+ * @text 横向对齐方式
+ * @desc 横向对齐方式
+ * @type select
+ * @option 左对齐
+ * @value left
+ * @option 居中
+ * @value center
+ * @option 右对齐
+ * @value right
+ * @default left
  * 
  * 
  * @param moveCenter
- * @text —— 移动画面中心 ——
+ * @text ———— 移动画面中心 ————
  * @default ——————————————
  * 
  * @param centerSwitch
@@ -67,6 +107,8 @@
   // #region 插件参数
 
   const params = PluginParamsParser.parse(PluginManager.parameters(PluginName), typeDefine);
+
+  window.gameVersion = params.versionNo;
 
   // #endregion
 
@@ -475,16 +517,16 @@
   };
 
   Scene_Boot.prototype.updateDocumentTitle = function() {
-    // document.title = TranslateUtils.getText($dataSystem.gameTitle) + ' v' + gameVersion;
+    document.title = TranslateUtils.getText($dataSystem.gameTitle) + ' v' + params.versionNo;
   };
 
   DataManager.onXhrLoad = function(xhr, name, src, url) {
     if (xhr.status < 400) {
       window[name] = JSON.parse(xhr.responseText);
       this.onLoad(window[name]);
-      if (name === "$dataSystem") {
-        $dataSystem.gameTitle = "";
-      }
+      // if (name === "$dataSystem") {
+      //   $dataSystem.gameTitle = "";
+      // }
     } else {
       this.onXhrError(name, src, url);
     }
@@ -537,6 +579,47 @@
 
   window.__TEMP_GAME_DATA = {
 
+  };
+
+  // 创建版本号标签
+  const _Scene_Title_create = Scene_Title.prototype.create;
+  Scene_Title.prototype.create = function() {
+    _Scene_Title_create.call(this);
+    this.createVersion();
+
+    $dataSystem.gameVersion = params.versionNo;
+    window.gameTitle = $dataSystem.gameTitle;
+    window.title = `${window.gameTitle} v${$dataSystem.gameVersion}`;
+  };
+  
+  Scene_Title.prototype.createVersion = function() {
+    const _bitmap = new Bitmap(200, 50);
+    this._gameVersionSprite = new Sprite(_bitmap);
+    this._gameVersionSprite.y = params.versionLabelY;
+    if (params.versionAlign === 'right') {
+      this._gameVersionSprite.x = params.versionLabelX - 200;
+    } else {
+      this._gameVersionSprite.x = params.versionLabelX;
+    }
+    _bitmap.textColor = '#FFFFFF';
+    _bitmap.fontSize = 20;
+    _bitmap.outlineWidth = 1;
+    _bitmap.drawText(`Ver ${params.versionNo}`, 0, 0, 200, 50, params.versionAlign || 'left');
+    this.addChild(this._gameVersionSprite);
+  };
+
+  // 修改保存的数据文件，在里面添加版本号
+  const _DataManager_makeSavefileInfo = DataManager.makeSavefileInfo;
+  DataManager.makeSavefileInfo = function() {
+
+    const _info = _DataManager_makeSavefileInfo.call(this);
+    
+    // 游戏版本
+    _info.gameVersion = params.versionNo || '';
+    _info.version = 'v' + _info.version;
+    _info.title = TranslateUtils.getText($dataSystem.gameTitle) + ' v' + params.versionNo;
+
+    return _info;
   };
 
   const _DataManager_createGameObjects = DataManager.createGameObjects;
