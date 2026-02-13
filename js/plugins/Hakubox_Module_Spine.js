@@ -385,17 +385,6 @@
  * @value dark,深色
  * @default normal,正常
  * 
- * 
- * @command setFernIsWithChild
- * @text 设置菲伦立绘的怀孕状态
- * @desc 设置菲伦立绘的怀孕状态
- * @arg isWithChild
- * @text 是否为怀孕状态
- * @desc 是否为怀孕状态
- * @type boolean
- * @on 怀孕
- * @off 未怀孕
- * @default false
  */
 
 /*~struct~SpineConfig:
@@ -1010,6 +999,8 @@
 
       const _face = face.split(',')[0];
       const _faceEx = faceEx ? faceEx.split(',')[0] : '';
+      $gameData.fern_tachie_face = _face;
+      $gameData.fern_tachie_faceEx = _faceEx;
 
       let _skins = [`face/${_face}`];
       if (faceEx) _skins.push(`face/${_faceEx}`);
@@ -1022,6 +1013,8 @@
     /** 设置菲伦的服装 */
     static setFernCloth(cloth) {
       if (!cloth) throw new Error(`Cloth "${cloth}" not found.`);
+
+      $gameData.fern_tachie_cloth = cloth;
 
       let _skins = '';
 
@@ -1067,6 +1060,9 @@
     /** 设置菲伦立绘涩涩 */
     static setFernSex(action, color = 'normal') {
       if (!action) throw new Error(`Action "${action}" not found.`);
+
+      $gameData.fern_tachie_sex = action;
+      $gameData.fern_tachie_sex_color = color;
       
       let _skins = '';
       let _colorIndex = ['normal', 'light', 'dark'].indexOf(color);

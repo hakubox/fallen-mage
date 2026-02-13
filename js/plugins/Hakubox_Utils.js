@@ -789,9 +789,9 @@
 
 
   // #region 标题菜单相关
-  
+
   const Scene_Title_createCommandWindow = Scene_Title.prototype.createCommandWindow;
-  Scene_Title.prototype.createCommandWindow = function() {
+  Scene_Title.prototype.createCommandWindow = function () {
     Scene_Title_createCommandWindow.call(this);
     this._commandWindow.visible = params.titleMenuVisible == undefined ? true : params.titleMenuVisible;
     this._gameTitleSprite.visible = params.titleVisible == undefined ? true : params.titleVisible;
@@ -877,6 +877,15 @@
     return 0;
   };
 
+  const _Window_Message_updatePlacement = Window_Message.prototype.updatePlacement;
+  Window_Message.prototype.updatePlacement = function () {
+    _Window_Message_updatePlacement.call(this);
+    if ($gameSystem && $gameSystem.isCgMode) {
+      this.x = (Graphics.width - Graphics.boxWidth) / 2;
+    } else {
+      this.x = 5;
+    }
+  };
 
   // #region 工具类
   /** 工具类 */
@@ -898,6 +907,8 @@
      * @param {boolean} isCgMode 是否CG模式
      */
     static changeCgMode(isCgMode = true) {
+      $gameSystem.isCgMode = isCgMode;
+
       if (isCgMode) {
         SceneManager._scene._messageWindow.x = (Graphics.width - Graphics.boxWidth) / 2;
       } else {
