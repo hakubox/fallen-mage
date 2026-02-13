@@ -78,7 +78,7 @@
     class PictureFadeEffect {
         constructor(pictureId, filename, x, y, fadeIn, wait, fadeOut, zoomX, zoomY) {
             this._pictureId = pictureId;
-            this._filename = filename.replace("pictures", "");
+            this._filename = filename.replace("pictures/", "").replace("pictures", "");
             this._x = x;
             this._y = y;
             this._fadeInTime = fadeIn;

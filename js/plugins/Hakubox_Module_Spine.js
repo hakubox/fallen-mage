@@ -1020,12 +1020,15 @@
 
       switch (cloth) {
         case 'coat':
+          Utils_Spine.fernClothKey2 = 'coat';
           _skins = 'clothes/coat';
           break;
         case 'clothing':
+          Utils_Spine.fernClothKey2 = 'clothing';
           _skins = 'clothes/clothing';
           break;
         case 'body':
+          Utils_Spine.fernClothKey2 = 'body';
           _skins = 'clothes/body';
           break;
         case 'maternity':

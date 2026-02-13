@@ -633,7 +633,6 @@
       const _text = TranslateUtils.getText(choice);
       // this.contents.fontSize = 35;
       const textWidth = this.textWidth(_text);
-      console.log('choice', choice, textWidth)
       const choiceWidth = Math.ceil(textWidth) + this.itemPadding() * 2;
       if (maxWidth < choiceWidth) {
         maxWidth = choiceWidth;
