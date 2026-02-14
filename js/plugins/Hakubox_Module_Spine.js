@@ -693,7 +693,7 @@
   };
 
   const _Scene_Base_start = Scene_Base.prototype.start;
-  Scene_Base.prototype.start = function () {
+  Scene_Map.prototype.start = function () {
     _Scene_Base_start.call(this);
     this.loadSceneElements();
   };
@@ -701,28 +701,62 @@
   /**
    * @description 加载当前场景配置的所有元素 (Spine, BG, FG)
    */
-  Scene_Base.prototype.loadSceneElements = function () {
+  Scene_Map.prototype.loadSceneElements = function () {
     this.clearAllSceneElements();
     const sceneName = SceneManager._scene.constructor.name;
-
-    // Load Spines
+    // Load Spines (Spine逻辑保持不变)
     spineConfigs.forEach(config => {
       if (config.scenes.includes(sceneName)) {
         this.createAndAddSpine(config);
       }
     });
-    // Load Backgrounds
-    backgroundConfigs.forEach(config => {
-      if (config.scenes.includes(sceneName)) {
-        this.createAndAddLayerImage(this._spineBackgroundContainer, config);
+    // ———— 修改开始：BG 背景逻辑 ————
+    const savedBg = $gameData.haku_bg_info; // 读取已经保存的背景信息
+    if (savedBg) {
+      // 如果有保存的信息，且标记为可见，则加载它
+      if (savedBg.visible) {
+        this.createAndAddLayerImage(this._spineBackgroundContainer, savedBg);
       }
-    });
-    // Load Foregrounds
-    foregroundConfigs.forEach(config => {
-      if (config.scenes.includes(sceneName)) {
-        this.createAndAddLayerImage(this._spineForegroundContainer, config);
+      // 如果 savedBg.visible 为 false，则此处什么都不做（覆盖了插件参数，达成“关闭后不自动打开”）
+    } else {
+      // 如果从未手动操作过（savedBg 为空），则走默认插件参数
+      backgroundConfigs.forEach(config => {
+        if (config.scenes.includes(sceneName)) {
+          this.createAndAddLayerImage(this._spineBackgroundContainer, config);
+          $gameData.haku_bg_info = {
+            imageFile: config.imageFile,
+            x: Number(config.x || 0),
+            y: Number(config.y || 0),
+            width: Number(config.width || 0),
+            height: Number(config.height || 0),
+            visible: true // 默认配置肯定是可见的
+          };
+        }
+      });
+    }
+    // ———— 修改开始：FG 前景逻辑 ————
+    const savedFg = $gameData.haku_fg_info; // 读取已经保存的前景信息
+    if (savedFg) {
+      // 如果有保存的信息，且标记为可见，则加载它
+      if (savedFg.visible) {
+        this.createAndAddLayerImage(this._spineForegroundContainer, savedFg);
       }
-    });
+    } else {
+      // 默认插件参数
+      foregroundConfigs.forEach(config => {
+        if (config.scenes.includes(sceneName)) {
+          this.createAndAddLayerImage(this._spineForegroundContainer, config);
+          $gameData.haku_fg_info = {
+            imageFile: config.imageFile,
+            x: Number(config.x || 0),
+            y: Number(config.y || 0),
+            width: Number(config.width || 0),
+            height: Number(config.height || 0),
+            visible: true
+          };
+        }
+      });
+    }
   };
 
   /**
@@ -1124,6 +1158,93 @@
       const _allSkins = Utils_Spine.getFernAllSkinsStr();
       Utils_Spine.setSkin(fernSpineId, _allSkins);
     }
+    // 辅助函数：仅用于在指令当前场景立即显示图片
+    static showLayerImage(container, args) {
+      if (!container) return;
+      container.removeChildren();
+      const bitmap = ImageManager.loadBitmap("img/", args.imageFile);
+      const sprite = new Sprite(bitmap);
+      sprite.x = Number(args.x);
+      sprite.y = Number(args.y);
+      // 等待图片加载以设置宽高
+      const w = Number(args.width);
+      const h = Number(args.height);
+      if (bitmap.isReady()) {
+        sprite.width = w || bitmap.width;
+        sprite.height = h || bitmap.height;
+      } else {
+        bitmap.addLoadListener(() => {
+          sprite.width = w || bitmap.width;
+          sprite.height = h || bitmap.height;
+        });
+      }
+      container.addChild(sprite);
+    }
+    /** 显示背景 */
+    static showBackground(args = {}) {
+      // 1. 保存状态到 $gameData
+      if (!$gameData.haku_bg_info) $gameData.haku_bg_info = {};
+      $gameData.haku_bg_info = {
+        imageFile: args.imageFile || $gameData.haku_bg_info.imageFile,
+        x: Number(args.x) || Number($gameData.haku_bg_info.x) || 0,
+        y: Number(args.y) || Number($gameData.haku_bg_info.y) || 0,
+        width: Number(args.width) || Number($gameData.haku_bg_info.width) || 0,
+        height: Number(args.height) || Number($gameData.haku_bg_info.height) || 0,
+        visible: true
+      };
+      // 2. 在当前场景执行显示
+      const scene = SceneManager._scene;
+      if (scene && scene._spineBackgroundContainer) {
+        Utils_Spine.showLayerImage(scene._spineBackgroundContainer, $gameData.haku_bg_info);
+      }
+    }
+    /** 隐藏背景 */
+    static hideBackground() {
+      // 1. 保存状态为隐藏
+      // 我们保留旧位置数据或直接覆盖为空均可，重要的是 visible: false
+      if ($gameData.haku_bg_info) {
+        $gameData.haku_bg_info.visible = false;
+      } else {
+        $gameData.haku_bg_info = { visible: false };
+      }
+      // 2. 清除当前显示
+      const scene = SceneManager._scene;
+      if (scene && scene._spineBackgroundContainer) {
+        scene._spineBackgroundContainer.removeChildren();
+      }
+    }
+    /** 显示前景 */
+    static showForeground(args = {}) {
+      // 1. 保存状态到 $gameData
+      if (!$gameData.haku_fg_info) $gameData.haku_fg_info = {};
+      $gameData.haku_fg_info = {
+        imageFile: args.imageFile || $gameData.haku_fg_info.imageFile,
+        x: Number(args.x) || Number($gameData.haku_fg_info.x) || 0,
+        y: Number(args.y) || Number($gameData.haku_fg_info.y) || 0,
+        width: Number(args.width) || Number($gameData.haku_fg_info.width) || 0,
+        height: Number(args.height) || Number($gameData.haku_fg_info.height) || 0,
+        visible: true
+      };
+      // 2. 执行显示
+      const scene = SceneManager._scene;
+      if (scene && scene._spineForegroundContainer) {
+        Utils_Spine.showLayerImage(scene._spineForegroundContainer, $gameData.haku_fg_info);
+      }
+    }
+    /** 隐藏前景 */
+    static hideForeground() {
+      // 1. 保存状态为隐藏
+      if ($gameData.haku_fg_info) {
+        $gameData.haku_fg_info.visible = false;
+      } else {
+        $gameData.haku_fg_info = { visible: false };
+      }
+      // 2. 清除当前显示
+      const scene = SceneManager._scene;
+      if (scene && scene._spineForegroundContainer) {
+        scene._spineForegroundContainer.removeChildren();
+      }
+    }
   }
   window.Utils_Spine = Utils_Spine;
 
@@ -1235,26 +1356,7 @@
     );
   });
 
-  
 
-  
-
-  
-
-  // --- Layer Commands ---
-  function showLayerImage(container, args) {
-    if (!container) return;
-    container.removeChildren();
-    const bitmap = ImageManager.loadBitmap("img/", args.imageFile);
-    const sprite = new Sprite(bitmap);
-    sprite.x = Number(args.x);
-    sprite.y = Number(args.y);
-    bitmap.addLoadListener(() => {
-      sprite.width = Number(args.width) || bitmap.width;
-      sprite.height = Number(args.height) || bitmap.height;
-    });
-    container.addChild(sprite);
-  }
 
   PluginManager.registerCommand(PLUGIN_NAME, "showTachie", args => {
     $gameSwitches.setValue(defaultVisibleSwitchId, true);
@@ -1272,31 +1374,19 @@
   });
 
   PluginManager.registerCommand(PLUGIN_NAME, "showBackground", args => {
-    const scene = SceneManager._scene;
-    if (scene && scene._spineBackgroundContainer) {
-      showLayerImage(scene._spineBackgroundContainer, args);
-    }
+    Utils_Spine.showBackground(args);
   });
 
   PluginManager.registerCommand(PLUGIN_NAME, "hideBackground", () => {
-    const scene = SceneManager._scene;
-    if (scene && scene._spineBackgroundContainer) {
-      scene._spineBackgroundContainer.removeChildren();
-    }
+    Utils_Spine.hideBackground();
   });
 
-  PluginManager.registerCommand(PLUGIN_NAME, "showForeground", args => {
-    const scene = SceneManager._scene;
-    if (scene && scene._spineForegroundContainer) {
-      showLayerImage(scene._spineForegroundContainer, args);
-    }
+  PluginManager.registerCommand(PLUGIN_NAME, "showForeground", (args = {}) => {
+    Utils_Spine.showForeground(args);
   });
 
   PluginManager.registerCommand(PLUGIN_NAME, "hideForeground", () => {
-    const scene = SceneManager._scene;
-    if (scene && scene._spineForegroundContainer) {
-      scene._spineForegroundContainer.removeChildren();
-    }
+    Utils_Spine.hideForeground();
   });
 
 })();

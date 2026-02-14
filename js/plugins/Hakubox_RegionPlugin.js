@@ -535,6 +535,10 @@
    */
   const _Game_CharacterBase_canPass = Game_CharacterBase.prototype.canPass;
   Game_CharacterBase.prototype.canPass = function (x, y, d) {
+    if (this.isThrough() || this.isDebugThrough()) {
+        return true;
+    }
+    
     const x2 = $gameMap.roundXWithDirection(x, d);
     const y2 = $gameMap.roundYWithDirection(y, d);
     // 1. 【最高优先级】强制阻挡
