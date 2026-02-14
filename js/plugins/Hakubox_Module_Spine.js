@@ -693,7 +693,7 @@
   };
 
   const _Scene_Base_start = Scene_Base.prototype.start;
-  Scene_Base.prototype.start = function () {
+  Scene_Map.prototype.start = function () {
     _Scene_Base_start.call(this);
     setTimeout(() => {
       this.loadSceneElements();
@@ -703,7 +703,7 @@
   /**
    * @description 加载当前场景配置的所有元素 (Spine, BG, FG)
    */
-  Scene_Base.prototype.loadSceneElements = function () {
+  Scene_Map.prototype.loadSceneElements = function () {
     this.clearAllSceneElements();
     const sceneName = SceneManager._scene.constructor.name;
     // Load Spines (Spine逻辑保持不变)
