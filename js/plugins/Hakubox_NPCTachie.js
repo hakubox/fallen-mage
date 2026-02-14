@@ -1,3 +1,6 @@
+//=============================================================================
+// ** RPG Maker MZ - Hakubox_NPCTachie.js
+//=============================================================================
 /*:
  * @target MZ
  * @plugindesc [V2.1] 独立立绘与动态高亮系统 - 修复动作与层级控制版
@@ -206,7 +209,7 @@
  */
 
 (function () {
-    const pluginName = "ShowAndHideALLPic";
+    const pluginName = "Hakubox_NPCTachie";
     const parameters = PluginManager.parameters(pluginName);
 
     // --- 参数解析 ---
@@ -216,11 +219,11 @@
     const maskDuration = Number(parameters['MaskDuration'] || 6);
     const maxMaskOpacity = Number(parameters['MaskOpacity'] || 128);
     const ignoreNames = (parameters['IgnoreNames'] || "").split(',').map(s => s.trim());
-    
+
     const globalDefaultX = Number(parameters['DefaultX'] || 640);
     const globalDefaultY = Number(parameters['DefaultY'] || 720);
     const globalDefaultScale = Number(parameters['DefaultScale'] || 1.0);
-    
+
     const fadeDur = Number(parameters['FadeDuration'] || 20);
     const slideOffset = Number(parameters['SlideOffset'] || 30);
 
@@ -243,19 +246,19 @@
     // ==============================================================================
 
     const _Game_System_initialize = Game_System.prototype.initialize;
-    Game_System.prototype.initialize = function() {
+    Game_System.prototype.initialize = function () {
         _Game_System_initialize.call(this);
         this.initTachieSystem();
     };
 
-    Game_System.prototype.initTachieSystem = function() {
+    Game_System.prototype.initTachieSystem = function () {
         // 数据结构: { "ActorName": { x, y, scale, fileName, opacity, maskOpacity, ... } }
-        this._tachieData = {}; 
+        this._tachieData = {};
         this._tachieVisible = true; // 全局显示开关
         this._currentSpeaker = null; // 当前正在说话的人
     };
 
-    Game_System.prototype.getTachieData = function(name) {
+    Game_System.prototype.getTachieData = function (name) {
         if (!this._tachieData) this.initTachieSystem();
         return this._tachieData[name];
     };
@@ -263,7 +266,7 @@
     // ==============================================================================
     // 修复后的 Game_System.showTachie (支持任意数量图层)
     // ==============================================================================
-    Game_System.prototype.showTachie = function(name, layersArray, x, y, scale) {
+    Game_System.prototype.showTachie = function (name, layersArray, x, y, scale) {
         if (!this._tachieData) this.initTachieSystem();
 
         // 确保 layersArray 是一个数组，哪怕只有一个图片
@@ -272,17 +275,17 @@
         if (!this._tachieData[name]) {
             this._tachieData[name] = {
                 name: name,
-                x: x, 
+                x: x,
                 y: y,
                 scale: scale,
                 layers: newLayers,    // 这里改为存储图层数组
-                opacity: 0,          
+                opacity: 0,
                 tint: 0xFFFFFF,       // 新增：色调值 (0xFFFFFF = 原色)
-                targetX: x,          
-                realX: x + slideOffset, 
-                targetOpacity: 255,   
-                visiblity: true,      
-                action: null          
+                targetX: x,
+                realX: x + slideOffset,
+                targetOpacity: 255,
+                visiblity: true,
+                action: null
             };
         } else {
             const d = this._tachieData[name];
@@ -291,49 +294,49 @@
             if (newLayers && newLayers.length > 0) {
                 // 如果原来的数据没有layers字段（旧存档兼容），初始化它
                 if (!d.layers) d.layers = [];
-                
+
                 // 逐个更新，保持数组长度足够
                 for (let i = 0; i < newLayers.length; i++) {
                     const path = newLayers[i];
-                     // 只有当路径不为 null 时才覆盖（允许保留上一句的表情/身体）
-                     // 如果传 "" 空字符串，表示卸载该层图片
+                    // 只有当路径不为 null 时才覆盖（允许保留上一句的表情/身体）
+                    // 如果传 "" 空字符串，表示卸载该层图片
                     if (path !== null && path !== undefined) {
                         d.layers[i] = path;
                     }
                 }
             }
-            
-            d.targetX = x; 
+
+            d.targetX = x;
             d.y = y;
             d.scale = scale;
             d.targetOpacity = 255;
             d.visiblity = true;
-            
+
             if (d.opacity <= 0) {
-                 d.realX = x + slideOffset;
-                 d.opacity = 0;
+                d.realX = x + slideOffset;
+                d.opacity = 0;
             }
         }
     };
 
 
 
-    Game_System.prototype.hideTachie = function(name) {
+    Game_System.prototype.hideTachie = function (name) {
         if (!this._tachieData || !this._tachieData[name]) return;
         const d = this._tachieData[name];
         d.visiblity = false;
         d.targetOpacity = 0;
     };
 
-    Game_System.prototype.hideAllTachies = function() {
+    Game_System.prototype.hideAllTachies = function () {
         if (!this._tachieData) return;
         Object.keys(this._tachieData).forEach(name => {
             this.hideTachie(name);
         });
-        this._currentSpeaker = null; 
+        this._currentSpeaker = null;
     };
 
-    Game_System.prototype.setTachieAction = function(name, type, power, duration, frequency) {
+    Game_System.prototype.setTachieAction = function (name, type, power, duration, frequency) {
         const d = this.getTachieData(name);
         if (d) {
             d.action = {
@@ -341,7 +344,7 @@
                 power: power,
                 duration: duration,
                 frequency: frequency || 10,
-                time: 0 
+                time: 0
             };
         }
     };
@@ -350,7 +353,7 @@
     // ==============================================================================
     // 2. 显示层: Sprite_Tachie (Class 重构版 - 支持多图层与Tint变暗)
     // ==============================================================================
-    
+
     class Sprite_Tachie extends Sprite {
         /**
          * @param {string} characterName 角色名称
@@ -358,14 +361,14 @@
         constructor(characterName) {
             super();
             this._characterName = characterName;
-            
+
             this.anchor.x = 0.5;
-            this.anchor.y = 1.0; 
+            this.anchor.y = 1.0;
             // 基础坐标记录
             this._baseX = 0;
             this._baseY = 0;
             // --- 核心结构 ---
-            this._layerSprites = []; 
+            this._layerSprites = [];
             this._layerFiles = [];
             // --- [关键修复]：防止切菜单回不再闪现 ---
             // 创建时检查一下：如果数据里标记为“隐藏目标(0)”，则直接按透明度0初始化
@@ -373,7 +376,7 @@
             if (data && data.targetOpacity === 0) {
                 this.opacity = 0;
                 // 强制同步数据里的当前透明度，防止update插值时产生反弹
-                data.opacity = 0; 
+                data.opacity = 0;
             }
         }
 
@@ -381,9 +384,9 @@
             super.update();
             // 只有当 switch 打开且系统允许显示时才进行更新计算
             // (虽然 visible 在外部控制，但内部计算可以做个防守，不过为了动作连贯性，通常保持一直计算)
-            this.updateLayers();             
+            this.updateLayers();
             this.updatePositionAndOpacity();
-            this.updateTone();               
+            this.updateTone();
             this.updateAction();
         }
 
@@ -401,7 +404,7 @@
             const folder = lastSlash >= 0 ? fullPath.substring(0, lastSlash + 1) : "img/pictures/";
             const file = lastSlash >= 0 ? fullPath.substring(lastSlash + 1) : fullPath;
             const fileNoExt = file.replace(/\.png$/i, "");
-            
+
             if (!fileNoExt) return null;
             return ImageManager.loadBitmap(folder, fileNoExt);
         }
@@ -425,7 +428,7 @@
                 s.anchor.x = 0.5;
                 s.anchor.y = 1.0;
                 this.addChild(s); // 添加到当前容器
-                
+
                 // 确保新加入的 Sprite Z轴顺序正确 (其实 addChild 默认就是在上面，这里不需要额外 sort，除非有特殊需求)
                 this._layerSprites.push(s);
                 this._layerFiles.push(null);
@@ -435,7 +438,7 @@
             for (let i = 0; i < layersData.length; i++) {
                 const fileName = layersData[i];
                 const sprite = this._layerSprites[i];
-                
+
                 // 仅当文件名变化时重新加载
                 if (this._layerFiles[i] !== fileName) {
                     this._layerFiles[i] = fileName;
@@ -478,12 +481,12 @@
             let targetTint = 0xFFFFFF; // 默认原色
             if (currentSpeaker && currentSpeaker !== this._characterName) {
                 const ignoreList = ignoreNames;
-                
+
                 // 只有当当前说话人有效（且不是自己）时，自己才变暗
                 // 注意：这里不需要判断 speaker 是否在 ignoreList，
                 // 因为照你的逻辑：菲伦(ignore)说话 -> A(非ignore) 应该变灰。
                 // 只要 A != 菲伦，且 A 也没在说话，A 就该黑。
-                
+
                 // 计算灰度值：255(白) -> 0(黑)
                 let val = Math.max(0, 255 - maxMaskOpacity);
                 targetTint = (val << 16) | (val << 8) | val;
@@ -491,7 +494,7 @@
             // 4. 遍历所有图层应用颜色 (修复因 Container 不传递 Tint 导致的无效问题)
             //    增加优化：如果颜色已经一致，就不再进行复杂的数学运算
             const step = 25; // 渐变速度
-            
+
             this._layerSprites.forEach(sprite => {
                 if (!sprite.visible) return; // 隐藏图层不处理
                 // 优化：如果当前颜色等于目标颜色，直接跳过
@@ -530,15 +533,10 @@
          */
         updatePositionAndOpacity() {
             const data = this.getData();
-            if (!data) { 
-                this.opacity = 0; 
-                return; 
+            if (!data) {
+                this.opacity = 0;
+                return;
             }
-            
-            // 获取参数
-            const params = PluginManager.parameters("ShowAndHideALLPic");
-            const fadeDur = Number(params['FadeDuration'] || 20);
-            const slideOffset = Number(params['SlideOffset'] || 30);
 
             // 透明度逻辑
             if (this.opacity < data.targetOpacity) {
@@ -554,26 +552,26 @@
                 // 退场时往旁边滑
                 targetX = data.targetX + slideOffset;
             }
-            
+
             // 计算滑动速度
-            const speed = Math.abs(targetX - data.realX) / (fadeDur / 2); 
-            
+            const speed = Math.abs(targetX - data.realX) / (fadeDur / 2);
+
             if (Math.abs(data.realX - targetX) > 0.5) {
                 if (data.realX < targetX) data.realX = Math.min(data.realX + speed, targetX);
                 else if (data.realX > targetX) data.realX = Math.max(data.realX - speed, targetX);
             } else {
-                 data.realX = targetX;
+                data.realX = targetX;
             }
 
             this._baseX = data.realX;
             this._baseY = data.y;
-            
+
             // 如果当前没有特殊动作，则把计算出的坐标应用给 Sprite
             if (!data.action) {
                 this.x = this._baseX;
                 this.y = this._baseY;
             }
-            
+
             this.scale.x = data.scale;
             this.scale.y = data.scale;
         }
@@ -584,32 +582,32 @@
         updateAction() {
             const data = this.getData();
             if (!data || !data.action) return;
-            
+
             const act = data.action;
             act.time++;
-            
+
             const p = Math.min(act.time / act.duration, 1.0);
             let offsetX = 0;
             let offsetY = 0;
 
-            if (act.type === 'jump') { 
+            if (act.type === 'jump') {
                 // 抛物线公式
-                offsetY = 4 * act.power * p * (p - 1); 
+                offsetY = 4 * act.power * p * (p - 1);
             } else if (act.type === 'shake') {
                 const freq = act.frequency || 10;
                 const sinFactor = Math.sin(p * Math.PI * 2 * freq);
-                offsetX = sinFactor * act.power * (1 - p); 
-            } else if (act.type === 'nod') { 
+                offsetX = sinFactor * act.power * (1 - p);
+            } else if (act.type === 'nod') {
                 // 点头 (向下)
-                offsetY = -(4 * act.power * p * (p - 1)); 
+                offsetY = -(4 * act.power * p * (p - 1));
             } else if (act.type === 'bounce') {
                 // Q弹
-                if (p < 0.6) { 
-                    const p1 = p / 0.6; 
-                    offsetY = 4 * act.power * p1 * (p1 - 1); 
-                } else { 
-                    const p2 = (p - 0.6) / 0.4; 
-                    offsetY = 4 * (act.power * 0.2) * p2 * (p2 - 1); 
+                if (p < 0.6) {
+                    const p1 = p / 0.6;
+                    offsetY = 4 * act.power * p1 * (p1 - 1);
+                } else {
+                    const p2 = (p - 0.6) / 0.4;
+                    offsetY = 4 * (act.power * 0.2) * p2 * (p2 - 1);
                 }
             }
 
@@ -617,7 +615,7 @@
             this.y = this._baseY + offsetY;
 
             if (act.time >= act.duration) {
-                data.action = null; 
+                data.action = null;
                 this.x = this._baseX;
                 this.y = this._baseY;
             }
@@ -630,12 +628,12 @@
     // ==============================================================================
 
     const _Spriteset_Base_createPictures = Spriteset_Base.prototype.createPictures;
-    Spriteset_Base.prototype.createPictures = function() {
+    Spriteset_Base.prototype.createPictures = function () {
         _Spriteset_Base_createPictures.call(this);
         this.createTachieContainer();
     };
 
-    Spriteset_Base.prototype.createTachieContainer = function() {
+    Spriteset_Base.prototype.createTachieContainer = function () {
         this._tachieContainer = new Sprite();
         // 初始化 Sprite 容器
         this._tachieSprites = {};
@@ -649,20 +647,20 @@
 
     // 在每一帧更新立绘内容
     const _Spriteset_Base_update = Spriteset_Base.prototype.update;
-    Spriteset_Base.prototype.update = function() {
+    Spriteset_Base.prototype.update = function () {
         _Spriteset_Base_update.call(this);
         this.updateTachies();
     };
 
-    Spriteset_Base.prototype.updateTachies = function() {
+    Spriteset_Base.prototype.updateTachies = function () {
         if (!this._tachieContainer || !$gameSystem) return;
-        
+
         const visible = $gameSwitches.value(switchId) && $gameSystem._tachieVisible;
         this._tachieContainer.visible = visible;
         if (!visible) return;
 
         const tachieData = $gameSystem._tachieData || {};
-        
+
         Object.keys(tachieData).forEach(name => {
             if (!this._tachieSprites[name]) {
                 const sprite = new Sprite_Tachie(name);
@@ -677,15 +675,15 @@
 
     // --- 核心：处理图层覆盖 (ABOVE 模式) ---
     // 我们需要在 WindowLayer 创建之后，把立绘容器放上去
-    
+
     // Scene_Map
     const _Scene_Map_createWindowLayer = Scene_Map.prototype.createWindowLayer;
-    Scene_Map.prototype.createWindowLayer = function() {
+    Scene_Map.prototype.createWindowLayer = function () {
         _Scene_Map_createWindowLayer.call(this);
         this.adjustTachieLayer();
     };
 
-    Scene_Map.prototype.adjustTachieLayer = function() {
+    Scene_Map.prototype.adjustTachieLayer = function () {
         if (layerPosition === 'ABOVE') {
             if (this._spriteset && this._spriteset._tachieContainer) {
                 // 把容器从 spriteset 拿出来，放到 Scene 的最上层 (WindowLayer 之后)
@@ -696,12 +694,12 @@
 
     // Scene_Battle (同理)
     const _Scene_Battle_createWindowLayer = Scene_Battle.prototype.createWindowLayer;
-    Scene_Battle.prototype.createWindowLayer = function() {
+    Scene_Battle.prototype.createWindowLayer = function () {
         _Scene_Battle_createWindowLayer.call(this);
         this.adjustTachieLayer();
     };
 
-    Scene_Battle.prototype.adjustTachieLayer = function() {
+    Scene_Battle.prototype.adjustTachieLayer = function () {
         if (layerPosition === 'ABOVE') {
             if (this._spriteset && this._spriteset._tachieContainer) {
                 this.addChild(this._spriteset._tachieContainer);
@@ -720,33 +718,29 @@
         return tachieConfigMap[cleanName] || null;
     }
 
-    Game_Message.prototype.getCurrentActorName = function(actorName) {
+    Game_Message.prototype.getCurrentActorName = function (actorName) {
         let expression = "";
         let _actorName = actorName || '';
         // --- 开始提取 <e> 标签 ---
         // 注意正则写得稍微宽容一点，防止有奇怪的空格
-        const regExp = /<(e.+?)>/i; 
+        const regExp = /<(e.+?)>/i;
         if (regExp.test(_actorName)) {
             _actorName = _actorName.replace(regExp, (_, e) => {
-                expression = e.trim(); 
+                expression = e.trim();
                 return ""; // 替换为空，即删除标签
             });
         }
         return { name: _actorName.trim(), expression: expression.trim() };
     }
-    
+
     // ==============================================================================
     // 3. 逻辑控制层 (修正版 setSpeakerName：自动互斥与构建数组)
     // ==============================================================================
     const _Game_Message_setSpeakerName = Game_Message.prototype.setSpeakerName;
-    Game_Message.prototype.setSpeakerName = function(speakerName) {
+    Game_Message.prototype.setSpeakerName = function (speakerName) {
         // 1. 先进行基础的正则处理，把标签提取出来，并不此时就修改 speakerName
         //    之所以不直接用父类方法，是因为要在父类方法调用前就把标签剥离干净
         //    否则父类(Window_NameBox)可能会拿到带标签的脏数据
-        
-        const pluginName = "ShowAndHideALLPic";
-        const params = PluginManager.parameters(pluginName);
-        const switchId = Number(params['SwitchId'] || 0);
 
         // 临时变量用于提取
         let tempProcessedName = speakerName || "";
@@ -756,13 +750,13 @@
         const regLoc = /<l\s*(-?\d+)\s*,\s*(-?\d+)(?:\s*,\s*(\d+(?:\.\d+)?))?>/i;
         if (regLoc.test(tempProcessedName)) {
             tempProcessedName = tempProcessedName.replace(regLoc, (_, x, y, s) => {
-                tempX = Number(x); 
-                tempY = Number(y); 
+                tempX = Number(x);
+                tempY = Number(y);
                 tempScale = s ? Number(s) : null;
                 return ""; // 替换为空，即删除标签
             });
         }
-        
+
         // --- 清理剩余残留和首尾空格 ---
         // 这一步得到的 cleanName 才是真正显示在名字框里的纯净名字
         const _actor = this.getCurrentActorName(tempProcessedName);
@@ -800,10 +794,6 @@
         // 注意：getConfigByName 内部也需要确保能匹配到 cleanName
         const config = getConfigByName(finalName);
         if (config || expression) {
-            const globalDefaultX = Number(params['DefaultX'] || 640);
-            const globalDefaultY = Number(params['DefaultY'] || 720);
-            const globalDefaultScale = Number(params['DefaultScale'] || 1.0);
-
             const finalX = tempX !== null ? tempX : (config && config.x !== null ? config.x : globalDefaultX);
             const finalY = tempY !== null ? tempY : (config && config.y !== null ? config.y : globalDefaultY);
             const finalScale = tempScale !== null ? tempScale : (config && config.scale !== null ? config.scale : globalDefaultScale);
@@ -823,7 +813,7 @@
 
     // --- 连贯性修复 ---
 
-    Game_Screen.prototype.getLeefInterpreter = function() {
+    Game_Screen.prototype.getLeefInterpreter = function () {
         // 1. 获取根解释器（地图 或 战斗）
         let interpreter = $gameParty.inBattle() ? $gameTroop._interpreter : $gameMap._interpreter;
         // 2. 循环向下查找，直到找到最底层的“叶子”解释器
@@ -839,12 +829,12 @@
         return interpreter;
     };
 
-    Game_Screen.prototype.isNextCommandContinuous = function() {
+    Game_Screen.prototype.isNextCommandContinuous = function () {
         const interpreter = this.getLeefInterpreter();
         if (!interpreter || !interpreter.isRunning()) return false;
 
         const list = interpreter._list;
-        let index = interpreter._index + 1; 
+        let index = interpreter._index + 1;
 
         const safeCodes = [
             102, 103, 104, 0, 118, 108, 408, 117, 121, 122, 123, 230, 231, 232, 234, 235,
@@ -875,7 +865,7 @@
         return false;
     };
 
-    Game_Screen.prototype.getInterpreter = function() {
+    Game_Screen.prototype.getInterpreter = function () {
         if ($gameParty.inBattle()) {
             return $gameTroop._interpreter;
         } else {
@@ -886,9 +876,9 @@
     // ==============================================================================
     // [新增] 场景切换与清理逻辑
     // ==============================================================================
-    
+
     // 辅助函数：清理 targetOpacity 为 0 的废弃数据
-    Game_System.prototype.cleanUpHiddenTachies = function() {
+    Game_System.prototype.cleanUpHiddenTachies = function () {
         if (!this._tachieData) return;
         Object.keys(this._tachieData).forEach(name => {
             // 如果目标是隐藏，直接删除数据，释放内存，防止鬼影
@@ -900,7 +890,7 @@
 
     // 1. 离开场景时清理 (解决切菜单/战斗回来后的残留)
     const _Scene_Base_terminate = Scene_Base.prototype.terminate;
-    Scene_Base.prototype.terminate = function() {
+    Scene_Base.prototype.terminate = function () {
         if ($gameSystem) $gameSystem.cleanUpHiddenTachies();
         _Scene_Base_terminate.call(this);
     };
@@ -909,7 +899,7 @@
     // 3. 对话/事件结束时的处理
     // ==============================================================================
     const _Window_Message_terminateMessage = Window_Message.prototype.terminateMessage;
-    Window_Message.prototype.terminateMessage = function() {
+    Window_Message.prototype.terminateMessage = function () {
         _Window_Message_terminateMessage.call(this);
         if (switchId && !$gameSwitches.value(switchId)) return;
         // 如果下一条指令是连续的（比如还有对话），就不隐藏
@@ -923,14 +913,36 @@
         }
     };
 
+    const _Window_NameBox_updatePlacement = Window_NameBox.prototype.updatePlacement;
+    Window_NameBox.prototype.updatePlacement = function () {
+        // 先调用原版逻辑，计算出默认的位置（左上）和宽高
+        _Window_NameBox_updatePlacement.call(this);
+        // 如果没有名字或者消息窗口还没准备好，就不处理
+        if (!this._name || !this._messageWindow) return;
+        // 获取当前显示的纯净名字（去除颜色代码等，如果有需要的话可以用 cleanName 逻辑，
+        // 但通常插件前文已经处理过 setSpeakerName，这里直接用 this._name 即可）
+        const currentName = this._name;
+        // 检查这个名字是否在插件定义的忽略名单(ignoreNames)里
+        // 注意：ignoreNames 变量必须在插件顶部已正确解析
+        if (ignoreNames.includes(currentName)) {
+            // --- 情况A：在忽略名单中（如旁白） -> 显示在右边 ---
+            // 算法：消息窗口的X + 消息窗口的宽 - 姓名框的宽
+            this.x = this._messageWindow.x + this._messageWindow.width - this.width;
+        } else {
+            // --- 情况B：正常角色 -> 显示在左边 ---
+            // 确保位置在左侧（虽然默认就是左侧，但为了防止逻辑污染再次强制归位）
+            this.x = this._messageWindow.x;
+        }
+    };
+
     // 2. 核心：在事件解释器结束时清理
     const _Game_Interpreter_terminate = Game_Interpreter.prototype.terminate;
-    Game_Interpreter.prototype.terminate = function() {
+    Game_Interpreter.prototype.terminate = function () {
         _Game_Interpreter_terminate.call(this);
         if (switchId && !$gameSwitches.value(switchId)) return;
         // 1. 检查是否是地图的主解释器 (正在跑点击事件/自动事件/公共事件的那条线)
         const isMapMain = (this === $gameMap._interpreter);
-        
+
         // 2. 检查是否是战斗的主解释器
         const isBattleMain = ($gameTroop && this === $gameTroop._interpreter);
         // 仅当是 "主事件流" 彻底结束时，才执行清场
@@ -960,12 +972,12 @@
         const power = Number(args.power || 40);
         const dur = Number(args.duration || 20);
         const freq = Number(args.frequency || 10);
-        
+
         $gameSystem.setTachieAction(name, type, power, dur, freq);
     });
 
     /** 插件外部接口 */
-    window.ShowAndHideALLPic = {
+    window.Hakubox_NPCTachie = {
         /** 
          * 强制显示/隐藏立绘层容器 
          * @param {boolean} isShow - true: 显示, false: 隐藏
@@ -982,8 +994,27 @@
             if (scene && scene._spriteset && scene._spriteset._tachieContainer) {
                 scene._spriteset._tachieContainer.visible = isShow;
             }
+        },
+        /**
+         * [新增] 判断当前说话人是否有配置立绘
+         * @returns {boolean} true=是立绘角色, false=无立绘/普通NPC
+         */
+        hasCurrentSpeakerTachie() {
+            // 1. 获取当前消息框的原始名字
+            const rawName = $gameMessage.speakerName();
+            if (!rawName) return false;
+            // 2. 清洗名字 (去除 <e> 表情标签)
+            // 使用插件内部扩展的 getCurrentActorName 方法
+            const cleanInfo = $gameMessage.getCurrentActorName(rawName);
+            let checkName = cleanInfo.name;
+            // 3. 额外清洗 (去除 <l> 坐标标签，防止干扰判断)
+            if (checkName) {
+                checkName = checkName.replace(/<l[^>]+>/gi, "").trim();
+            }
+            // 4. 检查该名字是否存在于配置列表 (tachieConfigMap) 中
+            // tachieConfigMap 是插件闭包内的变量，此处可以直接访问
+            return !!tachieConfigMap[checkName];
         }
     };
-
 
 })();
