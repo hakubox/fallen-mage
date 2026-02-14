@@ -10,29 +10,93 @@
  * 在地图事件头顶显示动态标签。
  * v2.1 特性：自动读取事件行走图的真实像素宽高，自动适配大型BOSS或大门的高度。
  * v2.2 特性：支持锁定图标朝向；支持对话时自动隐藏标签；支持插件指令。
+ * v2.3 新特性：
+ *   1. 【显示条件】：支持绑定开关、变量、独立开关，只有满足条件才显示标签。
+ *   2. 【多标签支持】：同一个事件可以写多个 <label> 备注，同时显示多个状态。
  *
  * ============================================================================
- * 使用方法（事件备注）：
+ * 基础用法（事件备注）：
  * ============================================================================
  * 在事件【备注】栏输入：
  *
- *   <label: 文本内容, [类型ID], [方向], [偏移]>
+ *   <label: 文本, [类型], [方向], [偏移], [条件]>
  *
- * 1. 文本内容：显示的文字。
- * 2. 类型ID  ：对应插件参数中配置的 ID。如果不填则用默认。
- * 3. 方向    ：数字小键盘方向 (1-9)。
- *             8=上, 2=下, 4=左, 6=右, 5=中 (事件中心)。
- *             7=左上, 9=右上, 1=左下, 3=右下。
- * 4. 偏移    ：手动微调坐标，格式为 [x]|[y]。支持正负数。
+ * 参数说明：
+ * 1. 文本 ：显示的文字。
+ * 2. 类型 ：对应插件参数中配置的 ID (如 event, npc)。不填则用默认。
+ * 3. 方向 ：数字小键盘方向 (8=上, 2=下, 4=左, 6=右, 5=中心)。
+ * 4. 偏移 ：微调坐标，格式为 x|y (例如 0|-20)。
+ * 5. 条件 ：(新功能) 判断是否显示的逻辑，支持开关/变量简写。
+ *
+ * ============================================================================
+ * [新功能] 条件判断示例 (第5个参数)：
+ * ============================================================================
+ * 你可以在第5个参数位置填写判断条件。支持以下简写：
+ *
+ * S + 数字   = 全局开关 (Switch)
+ * V + 数字   = 全局变量 (Variable，大于0为真)
+ * A, B, C, D = 独立开关 (Self Switch)
+ * !          = 逻辑"非" (不做某事时)
+ * &          = 逻辑"且" (两个都要满足)
+ * |          = 逻辑"或" (满足一个即可)
+ *
+ * --- 常用写法示例（可直接复制）---
+ *
+ * 1. 【独立开关】
+ *    当独立开关A打开时才显示：
+ *    <label:任务完成, event, 8, 0, A>
+ *
+ * 2. 【逻辑“或”】
+ *    独立开关A 或者 B 任意一个打开时显示：
+ *    <label:状态异常, event, 8, 0, A|B>
+ *
+ * 3. 【逻辑“且”】
+ *    独立开关A 和 B 都必须打开时才显示：
+ *    <label:隐藏剧情, event, 8, 0, A&B>
+ *
+ * 4. 【逻辑“非”与组合】
+ *    独立开关A打开，但 B 没打开时显示（即 A&!B）：
+ *    <label:进行中, event, 8, 0, A&!B>
+ *
+ * 5. 【全局开关】
+ *    当 10号开关 打开时显示：
+ *    <label:商店开启, event, 8, 0, S10>
+ *
+ *    当 10号开关 关闭时显示（注意前面的感叹号）：
+ *    <label:商店打烊, event, 8, 0, !S10>
+ *
+ * 6. 【全局变量】
+ *    当 10号变量 大于0 (非0) 时显示：
+ *    <label:好感度UP, event, 8, 0, V10>
+ *
+ * 7. 【自定义脚本】
+ *    如果以上简写不够用，可以直接写 JS 代码。
+ *    例如：当金币大于1000时显示：
+ *    <label:我很富有, event, 8, 0, $gameParty.gold()>1000>
+ *
+ * ============================================================================
+ * [新功能] 多标签叠加示例：
+ * ============================================================================
+ * 现在一个事件可以写多行 <label>，它们会同时判断、同时显示。
+ * 你可以利用偏移量 (第4个参数) 让它们错开位置。
+ *
+ * 示例场景：
+ * 一个NPC，头顶始终显示名字，当开关A开启时，额外在头顶更上方显示“(!)”任务图标。
+ *
+ * 在备注里写两行：
+ * <label: 村长, npc, 8, 0|0>
+ * <label: (!), quest, 8, 0|-40, A>
+ * 
+ * (注：第二行的 0|-40 表示向上偏移40像素，防止和名字重叠)
  *
  * ============================================================================
  * 插件指令 (Plugin Command)：
  * ============================================================================
  * 1. 显示/隐藏标签 (SetLabelVisible)
- *    可以手动强制隐藏或显示某个事件的标签。
- *    优先级高于自动隐藏。
+ *    强制隐藏某个事件的所有标签（例如演出时）。优先级高于条件判断。
  *
  * ============================================================================
+ * 
  * @param Global Settings
  * @text === 全局设置 ===
  *
@@ -406,34 +470,54 @@
         return merged;
     };
 
-    // --- 插件指令 (V2.2) ---
-    PluginManager.registerCommand(pluginName, "SetLabelVisible", function(args) {
-        const eId = Number(args.eventId) === 0 ? this.eventId() : Number(args.eventId);
-        const visible = String(args.visible) === 'true';
-        const event = $gameMap.event(eId);
-        if (event) {
-            // 设置一个强制隐藏标识
-            // 如果 visible = true, 我们设为 undefined/false，让自动逻辑接管
-            // 如果 visible = false, 我们设为 true (强制隐藏)
-            event._labelForceHidden = !visible;
+    // --- [新增/修改] 条件编译器：将字符串预编译为函数 ---
+    const createLabelConditionFunc = (condStr, gameEvent) => {
+        // 如果没有条件，返回 null，表示始终显示
+        if (!condStr || condStr.trim() === "") return null;
+        try {
+            // 1. 语法转换：将简写转换为 JS 代码
+            // 注意：先替换操作符，再替换变量，避免干扰
+            
+            // 替换 & -> &&, | -> ||
+            let script = condStr.replace(/&/g, ' && ').replace(/\|/g, ' || ');
+            // 替换 V10 -> !!$gameVariables.value(10) (强制转布尔)
+            script = script.replace(/\bV(\d+)\b/gi, (_, id) => {
+                return `!!$gameVariables.value(${id})`;
+            });
+            // 替换 S10 -> $gameSwitches.value(10)
+            script = script.replace(/\bS(\d+)\b/gi, (_, id) => {
+                return `$gameSwitches.value(${id})`;
+            });
+            // 替换 A-D -> 独立开关判断
+            script = script.replace(/\b([A-D])\b/g, (_, key) => {
+                // 使用 this._mapId 和 this._eventId
+                return `$gameSelfSwitches.value([${gameEvent._mapId}, ${gameEvent._eventId}, "${key.toUpperCase()}"])`;
+            });
+            // 2. 构造函数
+            // 生成的函数体类似于: return $gameSwitches.value(1) && !$gameSelfSwitches...
+            return new Function("return " + script);
+        } catch (e) {
+            console.warn(`[MapLabel] Compile Error: "${condStr}"`, e);
+            // 编译失败时，返回一个恒为 false 的函数，避免游戏报错
+            return function() { return false; };
         }
-    });
+    };
 
     // --- Game_Event 备注解析 (v2.1) ---
     const _Game_Event_setupPage = Game_Event.prototype.setupPage;
     Game_Event.prototype.setupPage = function () {
         _Game_Event_setupPage.call(this);
-        this.setupLabelData();
+        this.setupLabelData(this);
     };
-
-    Game_Event.prototype.setupLabelData = function () {
-        this._labelData = null;
+    
+    // --- [修改] Game_Event 读取多个标签 ---
+    Game_Event.prototype.setupLabelData = function (gameEvent) {
+        this._labelDataList = []; 
         if (!this.page()) return;
-
         const note = this.event().note || "";
-        const match = note.match(/<label:\s*(.+?)>/i);
-
-        if (match) {
+        const regex = /<label:\s*(.+?)>/gi;
+        let match;
+        while ((match = regex.exec(note)) !== null) {
             const content = match[1];
             const parts = content.split(/,|，/).map(s => s.trim());
             
@@ -441,8 +525,7 @@
             const type = parts[1] || "";
             let dir = parts[2] ? Number(parts[2]) : 8; 
             if (isNaN(dir)) dir = 8;
-
-            let offX = 0;
+            let offX = 0; 
             let offY = 0;
             const offStr = parts[3] || "";
             
@@ -461,15 +544,28 @@
                     }
                 }
             }
-
-            this._labelData = {
+            // 获取条件字符串，并立即编译成函数缓存起来
+            const conditionStr = parts[4] || "";
+            const conditionFunc = createLabelConditionFunc(conditionStr, gameEvent);
+            this._labelDataList.push({
                 text: text,
                 type: type,
                 dir: dir,
                 manualOx: offX,
-                manualOy: offY
-            };
+                manualOy: offY,
+                _condFunc: conditionFunc // 存储编译好的函数
+            });
         }
+    };
+
+    // 新增获取列表的方法
+    Game_Event.prototype.getLabelDataList = function () {
+        return this._labelDataList || [];
+    };
+
+    // 兼容旧接口（如果其他地方用了），返回第一个
+    Game_Event.prototype.getLabelData = function () {
+        return (this._labelDataList && this._labelDataList.length > 0) ? this._labelDataList[0] : null;
     };
 
     Game_Event.prototype.getLabelData = function () {
@@ -723,38 +819,45 @@
         }
 
         update() {
-            super.update();
+            Sprite.prototype.update.call(this);
             if (!this._character) return;
             
-            // 0. V2.2: 插件指令强制隐藏
+            // 0. 强制隐藏
             if (this._character._labelForceHidden) {
                 this.visible = false;
                 return;
             }
-
-            // 1. 开关检查
+            // 1. 全局开关
             if (globalSwitchId > 0 && !$gameSwitches.value(globalSwitchId)) {
                 this.visible = false;
                 return;
             }
-
-            // 2. 数据与透明性检查
-            const data = this._character instanceof Game_Event ? this._character.getLabelData() : null;
+            const data = this._assignedData; 
+            
+            // 2. 基础数据检查
             if (!data || this._character.isTransparent() || this._character._erased) {
                 this.visible = false;
                 return;
             }
-
-            // 2.5 [V2.2] 自动隐藏交互
+            // --- [修改点] 高效执行条件 ---
+            // 如果存在 _condFunc，则执行之。
+            // 使用 .call(this._character) 将 this 指向当前的 Game_Event
+            if (data._condFunc) {
+                // 执行函数。如果返回 false，则隐藏
+                if (!data._condFunc.call(this._character)) {
+                    this.visible = false;
+                    return;
+                }
+            }
+            
+            // 2.5 交互隐藏
             if (autoHideInteraction) {
-                // 如果当前地图正在跑事件，且那个事件就是我自己，那么隐藏
                 if ($gameMap.isEventRunning()) {
                     this.visible = false;
                     return;
                 }
             }
-
-            // 3. 屏幕外剔除 
+            // 3. 屏幕外优化 (以下逻辑保持原样)
             const charX = this._character.screenX();
             const charY = this._character.screenY();
             const margin = 300; 
@@ -763,24 +866,15 @@
                 this.visible = false;
                 return;
             }
+            
             this.visible = true;
-
-            // 4. 数据变更重绘
             if (JSON.stringify(data) !== JSON.stringify(this._lastData)) {
                 this._lastData = data;
                 this.refresh(data);
             }
-
-            // 5. 距离计算
             this.updateVisibilityDistance(charX, charY);
-
-            // 6. 位置更新
             if (this.visible && this.opacity > 0) {
                 this.updatePosition(charX, charY, data);
-            }
-
-            // 7. 动画更新
-            if (this.visible && this.opacity > 0) {
                 this.updateEffects();
                 this.updateDecoWalk();
             }
@@ -981,6 +1075,10 @@
             this._decoSprite.setFrame(sx, sy, w, h);
         }
         // ------------------------------------
+
+        setTargetData(data) {
+            this._assignedData = data;
+        };
     }
 
 
@@ -990,33 +1088,59 @@
         this.updateLabel();
     };
 
+    // --- [修改] Sprite_Character 管理多个 Label ---
     Sprite_Character.prototype.updateLabel = function () {
         if (!(this._character instanceof Game_Event) || !this.parent) return;
         
-        const labelData = this._character.getLabelData();
+        // 确保数组存在
+        if (!this._labelSprites) this._labelSprites = [];
+        const dataList = this._character.getLabelDataList();
         
-        if (labelData) {
-            if (!this._labelSprite) {
-                this._labelSprite = new Sprite_EventLabel(this._character);
-                this.parent.addChild(this._labelSprite); 
+        // 1. 数量同步：如果数据变多了，通过 new 补齐；变少了，remove 掉多余的
+        if (this._labelSprites.length < dataList.length) {
+            for (let i = this._labelSprites.length; i < dataList.length; i++) {
+                const sprite = new Sprite_EventLabel(this._character);
+                this.parent.addChild(sprite);
+                this._labelSprites.push(sprite);
             }
-        } else {
-            if (this._labelSprite) {
-                if (this._labelSprite.parent) {
-                    this._labelSprite.parent.removeChild(this._labelSprite);
-                }
-                this._labelSprite = null;
+        } else if (this._labelSprites.length > dataList.length) {
+            for (let i = this._labelSprites.length - 1; i >= dataList.length; i--) {
+                const sprite = this._labelSprites[i];
+                if (sprite.parent) sprite.parent.removeChild(sprite);
+                this._labelSprites.splice(i, 1);
             }
+        }
+        // 2. 逐个更新数据
+        for (let i = 0; i < this._labelSprites.length; i++) {
+            const sprite = this._labelSprites[i];
+            const data = dataList[i];
+            // 调用 Sprite_EventLabel 的新方法来注入数据
+            sprite.setTargetData(data);
+        }
+    };
+    // 清理逻辑也要改，遍历清理
+    const _Sprite_Character_onRemove_Override = Sprite_Character.prototype.onRemove;
+    Sprite_Character.prototype.onRemove = function() {
+        if (_Sprite_Character_onRemove_Override) _Sprite_Character_onRemove_Override.call(this);
+        if (this._labelSprites) {
+            this._labelSprites.forEach(sprite => {
+                if (sprite.parent) sprite.parent.removeChild(sprite);
+            });
+            this._labelSprites = [];
         }
     };
     
-    const _Sprite_Character_remove = Sprite_Character.prototype.onRemove || function(){};
-    Sprite_Character.prototype.onRemove = function() {
-        if (_Sprite_Character_remove) _Sprite_Character_remove.call(this);
-        if (this._labelSprite && this._labelSprite.parent) {
-            this._labelSprite.parent.removeChild(this._labelSprite);
-            this._labelSprite = null;
+
+    PluginManager.registerCommand(pluginName, "SetLabelVisible", function(args) {
+        const eId = Number(args.eventId) === 0 ? this.eventId() : Number(args.eventId);
+        const visible = String(args.visible) === 'true';
+        const event = $gameMap.event(eId);
+        if (event) {
+            // 设置一个强制隐藏标识
+            // 如果 visible = true, 我们设为 undefined/false，让自动逻辑接管
+            // 如果 visible = false, 我们设为 true (强制隐藏)
+            event._labelForceHidden = !visible;
         }
-    };
+    });
 
 })();
