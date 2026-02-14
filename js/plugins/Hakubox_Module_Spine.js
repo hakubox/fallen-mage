@@ -695,7 +695,9 @@
   const _Scene_Base_start = Scene_Base.prototype.start;
   Scene_Map.prototype.start = function () {
     _Scene_Base_start.call(this);
-    this.loadSceneElements();
+    setTimeout(() => {
+      this.loadSceneElements();
+    }, 100);
   };
 
   /**
