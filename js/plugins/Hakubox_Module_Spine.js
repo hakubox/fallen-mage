@@ -724,15 +724,19 @@
       // 如果从未手动操作过（savedBg 为空），则走默认插件参数
       backgroundConfigs.forEach(config => {
         if (config.scenes.includes(sceneName)) {
-          this.createAndAddLayerImage(this._spineBackgroundContainer, config);
-          $gameData.haku_bg_info = {
-            imageFile: config.imageFile,
-            x: Number(config.x || 0),
-            y: Number(config.y || 0),
-            width: Number(config.width || 0),
-            height: Number(config.height || 0),
-            visible: true // 默认配置肯定是可见的
-          };
+          if (!$gameData.haku_bg_info) {
+            $gameData.haku_bg_info = {
+              imageFile: config.imageFile,
+              x: Number(config.x || 0),
+              y: Number(config.y || 0),
+              width: Number(config.width || 0),
+              height: Number(config.height || 0),
+              visible: true // 默认配置肯定是可见的
+            };
+          }
+          if ($gameData.haku_bg_info.visible) {
+            this.createAndAddLayerImage(this._spineBackgroundContainer, $gameData.haku_bg_info);
+          }
         }
       });
     }
@@ -747,15 +751,19 @@
       // 默认插件参数
       foregroundConfigs.forEach(config => {
         if (config.scenes.includes(sceneName)) {
-          this.createAndAddLayerImage(this._spineForegroundContainer, config);
-          $gameData.haku_fg_info = {
-            imageFile: config.imageFile,
-            x: Number(config.x || 0),
-            y: Number(config.y || 0),
-            width: Number(config.width || 0),
-            height: Number(config.height || 0),
-            visible: true
-          };
+          if (!$gameData.haku_fg_info) {
+            $gameData.haku_fg_info = {
+              imageFile: config.imageFile,
+              x: Number(config.x || 0),
+              y: Number(config.y || 0),
+              width: Number(config.width || 0),
+              height: Number(config.height || 0),
+              visible: true
+            };
+          }
+          if ($gameData.haku_fg_info.visible) {
+            this.createAndAddLayerImage(this._spineForegroundContainer, $gameData.haku_fg_info);
+          }
         }
       });
     }
