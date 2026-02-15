@@ -692,9 +692,9 @@
     }
   };
 
-  const _Scene_Base_start = Scene_Base.prototype.start;
+  const _Scene_Map_start = Scene_Map.prototype.start;
   Scene_Map.prototype.start = function () {
-    _Scene_Base_start.call(this);
+    _Scene_Map_start.call(this);
     setTimeout(() => {
       this.loadSceneElements();
     }, 100);
