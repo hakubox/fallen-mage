@@ -835,6 +835,7 @@
 
         const list = interpreter._list;
         let index = interpreter._index + 1;
+        const maxStep = index + 50;
 
         const safeCodes = [
             102, 103, 104, 0, 118, 108, 408, 117, 121, 122, 123, 230, 231, 232, 234, 235,
@@ -842,12 +843,15 @@
         ];
 
         while (index < list.length) {
+            if (index > maxStep) return false; // 防止死循环
+
             const cmd = list[index];
             const code = cmd.code;
 
             if (code === 101) {
                 if (!cmd.parameters[4]) {
-                    return true;
+                    index++;
+                    continue;
                 }
                 const _actor = $gameMessage.getCurrentActorName(cmd.parameters[4])
                 if (_actor.name == $gameSystem._currentSpeaker) {
