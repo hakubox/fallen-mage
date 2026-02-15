@@ -846,6 +846,9 @@
             const code = cmd.code;
 
             if (code === 101) {
+                if (!cmd.parameters[4]) {
+                    return true;
+                }
                 const _actor = $gameMessage.getCurrentActorName(cmd.parameters[4])
                 if (_actor.name == $gameSystem._currentSpeaker) {
                     return true; // Show Text
