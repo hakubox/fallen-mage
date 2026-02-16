@@ -1,7 +1,7 @@
 /*:
  * @target MZ
  * @plugindesc [v4.0] Hakubox 历史记录插件 - 修复优化版
- * @author Hakubox (Fixed by AI)
+ * @author Hakubox
  *
  * @help
  * ============================================================================
