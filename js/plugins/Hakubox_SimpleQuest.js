@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc [v2.1] 高级HUD任务系统
+ * @plugindesc [v3.1] 高级HUD任务系统 (Auto-Condition & Limits)
  * @author hakubox
  * @help
  * 
@@ -9,42 +9,34 @@
  * ============================================================================
  * 这是一个基于“模板-实例”架构的任务系统。配置是模板，接任务是创建实例。
  * 
- * [v2.1更新]
- * 新增任务进度支持。现在任务可以设置 0/10 这种搜集进度了。
+ * [v3.1更新]
+ * 1. 动态刷新：现在会每30帧检测一次显示条件，条件满足时自动显示/隐藏。
+ * 2. 领取限制：支持设置单个任务的最大领取次数（例如：一次性任务）。
+ * 3. API增强：提供了查询任务状态和历史记录的脚本函数。
  *
- * 【核心变更】
- * 1. 允许重复接取相同的任务模板（例如：每日循环任务）。
- * 2. 任务状态分为：0:进行中, 1:成功(未提交), 2:失败, 3:完成(归档/消失)。
- * 3. 自动完成机制：当进度达到最大值时，状态自动变为 1(成功)。
- *
- * 【脚本指令 (Script Calls)】
+ * 【核心变量占位符】
+ * 在任务标题、描述中可以使用以下占位符：
+ * {current} - 当前进度值
+ * {max}     - 最大进度值
  * 
- * --- 基础操作 ---
- * 
- * // 1. 接受任务 (返回生成的实例UUID)
- * const uuid = SimpleQuest.addQuest("quest_01"); 
+ * 例如标题配置为： "收集史莱姆粘液 ({current}/{max})"
  *
- * // 2. 增加任务进度 (最常用)
- * // 给最新接取的 "quest_01" 增加 1 点进度
- * SimpleQuest.addLatestProgress("quest_01", 1);
+ * 【脚本指令 (Script Calls) - 用于条件分歧】
  * 
- * // 3. 直接设置进度
- * // 设置最新 "quest_01" 进度为 5
- * SimpleQuest.setLatestProgress("quest_01", 5);
- *
- * // 4. 改变任务状态
- * // status: 0:进行中, 1:成功, 2:失败, 3:完成
- * // 注意：如果没有达到最大进度强行设置 Success，进度会自动填满。
- * SimpleQuest.setLatestStatus("quest_01", 1);
- *
- * // 5. 更新描述
- * SimpleQuest.updateLatestDesc("quest_01", "新的阶段描述...");
+ * 1. 判断玩家当前是否正在做某任务 (ID: quest_01)
+ *    SimpleQuest.isActive("quest_01")
+ *    -> 返回 true/false
  * 
- * // 6. 删除/放弃任务
- * SimpleQuest.removeLatest("quest_01");
+ * 2. 判断玩家是否曾经接触过某任务 (无论正在做、完成还是失败)
+ *    SimpleQuest.hasHistory("quest_01")
+ *    -> 返回 true/false
+ *
+ * 3. 获取玩家领取某任务的总次数
+ *    SimpleQuest.countHistory("quest_01")
+ *    -> 返回 数字 (0, 1, 2...)
  *
  * ============================================================================
- * @param ---HUD外观设置---
+ * @param ---HUD外观基础---
  *
  * @param hudX
  * @text X坐标
@@ -61,29 +53,77 @@
  * @type number
  * @default 320
  *
- * @param itemPadding
- * @text 任务间距
+ * @param maxRunningQuests
+ * @text 全局最大同时领取数量
+ * @desc 玩家身上同时存在的任务总数上限(-1为不限制)。
  * @type number
- * @default 12
+ * @min -1
+ * @default 5
+ *
+ * @param itemPadding
+ * @text 任务内容内边距
+ * @type number
+ * @default 8
  *
  * @param sectionSpacing
- * @text 分组间距
+ * @text 分组垂直间距
  * @type number
  * @default 24
  *
- * @param showBackground
- * @text 是否显示背景框
+ * @param ---背景与圆角---
+ *
+ * @param showListBackground
+ * @text 是否显示整体背景
  * @type boolean
- * @default false
+ * @default true
+ * 
+ * @param listBackgroundColor
+ * @text 整体背景色(Hex/RGBA)
+ * @type string
+ * @default rgba(0, 0, 0, 0.5)
  *
- * @param backOpacity
- * @text 背景透明度
+ * @param headerBackgroundColor
+ * @text 分组标题背景色
+ * @type string
+ * @default rgba(0, 0, 0, 0.6)
+ *
+ * @param borderRadius
+ * @text 圆角度数
  * @type number
- * @min 0
- * @max 255
- * @default 128
+ * @default 8
  *
- * @param ---状态文本配置---
+ * @param ---文字效果---
+ * 
+ * @param fontOutlineWidth
+ * @text 文字描边宽度
+ * @type number
+ * @default 3
+ * 
+ * @param fontShadowDistance
+ * @text 文字阴影距离
+ * @desc 0为不显示阴影
+ * @type number
+ * @default 1
+ *
+ * @param ---全局音效配置---
+ * @desc 如果任务模板里没配音频，则使用这里的默认音频。
+ *
+ * @param seAccept
+ * @text [默认] 接取音效
+ * @type file
+ * @dir audio/se/
+ *
+ * @param seSuccess
+ * @text [默认] 成功音效
+ * @type file
+ * @dir audio/se/
+ *
+ * @param seFail
+ * @text [默认] 失败音效
+ * @type file
+ * @dir audio/se/
+ *
+ * @param ---状态前缀文本---
  *
  * @param textRunning
  * @text [进行中] 前缀
@@ -114,12 +154,6 @@
  * @text [失败] 颜色
  * @type number
  * @default 10
- * 
- * @param colorProgress
- * @text [进度] 文字颜色
- * @type number
- * @default 14
- * @desc 显示 "{1/5}" 这种进度信息时的文字颜色索引。
  *
  * @param ---数据配置---
  *
@@ -190,7 +224,7 @@
  * @type string
  * @arg desc
  * @text 新描述内容
- * @type note
+ * @type multiline_string
  */
 
 /*~struct~Category:
@@ -220,6 +254,11 @@
  * @text 任务ID
  * @desc 调用指令时用的ID。
  * @type string
+ * 
+ * @param r
+ * @text 备注
+ * @desc 调用指令时用的ID。
+ * @type string
  *
  * @param typeId
  * @text 所属类型ID
@@ -229,9 +268,23 @@
  * @option sub
  * @default main
  *
+ * @param maxRepeat
+ * @text 最大领取次数
+ * @desc 该任务限制领取的总次数（含失败）。-1为无限。
+ * @type number
+ * @min -1
+ * @default -1
+ *
+ * @param condition
+ * @text 显示条件(JS代码)
+ * @type string
+ * @desc 返回true显示，false隐藏。为空则始终显示。
+ * @default 
+ *
  * @param title
  * @text 任务标题
  * @type string
+ * @desc 支持 {current} {max} 占位符。
  *
  * @param maxProgress
  * @text 最大进度值
@@ -240,37 +293,47 @@
  * @default 1
  * @desc 例如搜集10个物品，这里填10。若只是对话任务，默认为1。
  * 
- * @param progressFmt
- * @text 进度显示模板
- * @type string
- * @desc 不填则不显示。支持格式：【{current}/{max}只】。
- *
  * @param desc
  * @text 初始描述
- * @type note
- * @desc 支持多行和控制字符。
+ * @type multiline_string
+ * @desc 支持多行和 {current} {max}。
  *
  * @param rewardText
  * @text 奖励说明
- * @desc 显示在标题右侧的简短文本。
+ * @desc 显示在标题右侧（或下一行右侧）的简短文本。
  * @type string
+ *
+ * @param seAccept
+ * @text [音效] 接取时
+ * @type file
+ * @dir audio/se/
+ * 
+ * @param seSuccess
+ * @text [音效] 成功时
+ * @type file
+ * @dir audio/se/
+ * 
+ * @param seFail
+ * @text [音效] 失败时
+ * @type file
+ * @dir audio/se/
  *
  * @param onAccept
  * @text [脚本] 接受时执行
- * @type note
+ * @type multiline_string
  * @desc 变量 quest 可访问当前实例。
  *
  * @param onSuccess
  * @text [脚本] 成功时执行
- * @type note
+ * @type multiline_string
  *
  * @param onFail
  * @text [脚本] 失败时执行
- * @type note
+ * @type multiline_string
  *
  * @param onComplete
  * @text [脚本] 完成时执行
- * @type note
+ * @type multiline_string
  */
 
 (() => {
@@ -296,108 +359,168 @@
         }
     }
 
-    // 生成唯一UUID
     function generateUUID() {
-        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
             var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
             return v.toString(16);
         });
+    }
+
+    function playSe(filename) {
+        if (filename) {
+            AudioManager.playSe({ name: filename, volume: 90, pitch: 100, pan: 0 });
+        }
     }
 
     const CONFIG = {
         x: Number(PARAMS['hudX'] || 10),
         y: Number(PARAMS['hudY'] || 10),
         width: Number(PARAMS['hudWidth'] || 320),
-        itemPadding: Number(PARAMS['itemPadding'] || 12),
+        maxRunningQuests: Number(PARAMS['maxRunningQuests'] || 5),
+        itemPadding: Number(PARAMS['itemPadding'] || 8),
         sectionSpacing: Number(PARAMS['sectionSpacing'] || 24),
-        showBg: PARAMS['showBackground'] === 'true',
-        backOpacity: Number(PARAMS['backOpacity'] || 128),
-        colorProgress: Number(PARAMS['colorProgress'] || 14), 
+        
+        showBg: PARAMS['showListBackground'] === 'true',
+        bgColor: PARAMS['listBackgroundColor'] || 'rgba(0,0,0,0.5)',
+        headerBgColor: PARAMS['headerBackgroundColor'] || 'rgba(0,0,0,0.6)',
+        borderRadius: Number(PARAMS['borderRadius'] || 8),
+        
+        outlineWidth: Number(PARAMS['fontOutlineWidth'] || 3),
+        shadowDist: Number(PARAMS['fontShadowDistance'] || 1),
+
+        globalSe: {
+            accept: PARAMS['seAccept'],
+            success: PARAMS['seSuccess'],
+            fail: PARAMS['seFail']
+        },
+
         statusText: {
             0: { text: PARAMS['textRunning'], color: Number(PARAMS['colorRunning']) },
             1: { text: PARAMS['textSuccess'], color: Number(PARAMS['colorSuccess']) },
             2: { text: PARAMS['textFail'], color: Number(PARAMS['colorFail']) },
         },
-        categories: parseStructList(PARAMS['categoryList']).sort((a,b) => Number(a.priority) - Number(b.priority)),
-        templates: {} // Map结构
+        categories: parseStructList(PARAMS['categoryList']).sort((a, b) => Number(a.priority) - Number(b.priority)),
+        templates: {}
     };
 
     // 构建任务 Map
     const tempArr = parseStructList(PARAMS['questTemplates']);
     for (let i = 0; i < tempArr.length; i++) {
         const t = tempArr[i];
+        let _desc = t.desc || '';
+        
+        let _condFunc = null;
+        if (t.condition && t.condition.trim() !== "") {
+            try {
+                _condFunc = new Function("return (" + t.condition + ");");
+            } catch (e) {
+                console.error("SimpleQuest: Condition Parse Error for " + t.id, e);
+            }
+        }
+
         CONFIG.templates[t.id] = {
             id: t.id,
             typeId: t.typeId,
             title: t.title,
-            maxProgress: Number(t.maxProgress || 1), // 默认1
-            progressFmt: t.progressFmt || "",        // 默认空
-            desc: JSON.parse(t.desc || "\"\""),
+            maxProgress: Number(t.maxProgress || 1),
+            maxRepeat: parseInt(t.maxRepeat || -1), // 新增：最大重复次数
+            conditionFunc: _condFunc,
+            desc: _desc || "",
             rewardText: t.rewardText,
-            onAccept: JSON.parse(t.onAccept || "\"\""),
-            onSuccess: JSON.parse(t.onSuccess || "\"\""),
-            onFail: JSON.parse(t.onFail || "\"\""),
-            onComplete: JSON.parse(t.onComplete || "\"\"")
+            
+            seAccept: t.seAccept || CONFIG.globalSe.accept,
+            seSuccess: t.seSuccess || CONFIG.globalSe.success,
+            seFail: t.seFail || CONFIG.globalSe.fail,
+
+            onAccept: t.onAccept || "",
+            onSuccess: t.onSuccess || "",
+            onFail: t.onFail || "",
+            onComplete: t.onComplete || ""
         };
     }
 
-    // 类定义：任务状态枚举
     const Q_STATUS = {
         RUNNING: 0,
-        SUCCESS: 1, // 已达标但未交
+        SUCCESS: 1, 
         FAIL: 2,
-        COMPLETE: 3 // 已交/归档
+        COMPLETE: 3
     };
 
     // ======================================================================
-    // 1. 全局管理器 (Window Context)
+    // 1. 全局管理器 (Window Context) & Utilities
     // ======================================================================
 
     window.SimpleQuest = {
-        // --- 核心接口 ---
+        
+        // --- 核心操作 ---
 
-        // 添加任务 (基于任务模板创建实例)
-        addQuest: function(templateId) {
-            if (!CONFIG.templates[templateId]) {
+        addQuest(templateId) {
+            const template = CONFIG.templates[templateId];
+            if (!template) {
                 console.warn(PLUGIN_NAME + ": Template not found: " + templateId);
                 return null;
             }
+
+            // 1. 检查单一任务的领取次数限制
+            if (template.maxRepeat !== -1) {
+                const historyCount = this.countHistory(templateId);
+                // 注意：这里用 >= 是因为 countHistory 包含当前正在进行的
+                // 如果是“只允许做1次”，此时historyCount如果已经是1(比如正在做)，就不让做了？
+                // 逻辑应该是：允许接取的前提是 (历史总数 < 上限)。
+                // 因为接取时，countHistory 还没有+1 (实例还没加进去)。
+                if (historyCount >= template.maxRepeat) {
+                    console.log(PLUGIN_NAME + ": Quest template limit reached for " + templateId);
+                    return null;
+                }
+            }
+
+            // 2. 检查全局正在进行的任务数量限制
+            if (CONFIG.maxRunningQuests !== -1) {
+                const runningCount = $gameSystem.countRunningQuests();
+                if (runningCount >= CONFIG.maxRunningQuests) {
+                    console.log(PLUGIN_NAME + ": Global Active Quest limit reached.");
+                    return null;
+                }
+            }
+
             const uuid = generateUUID();
-            const template = CONFIG.templates[templateId];
 
             const instance = {
                 uuid: uuid,
                 templateId: templateId,
                 typeId: template.typeId,
-                title: template.title, 
-                desc: template.desc,   
+                title: template.title,
+                desc: template.desc,
                 status: Q_STATUS.RUNNING,
-                progress: 0, // 当前进度
-                maxProgress: template.maxProgress, // 最大进度
+                progress: 0, 
+                maxProgress: template.maxProgress, 
                 timestamp: Date.now()
             };
 
             $gameSystem.addQuestInstance(instance);
+            playSe(template.seAccept);
             this._evalCode(template.onAccept, instance);
             return uuid;
         },
 
-        // 设置指定实例的状态
-        setStatusByUuid: function(uuid, status) {
+        setStatusByUuid(uuid, status) {
             const instance = $gameSystem.getQuestByUuid(uuid);
             if (!instance) return;
             if (instance.status === status) return;
 
             instance.status = status;
 
-            // 特殊逻辑：如果是直接设为成功/完成，且进度不满，自动补满
             if ((status === Q_STATUS.SUCCESS || status === Q_STATUS.COMPLETE) && instance.progress < instance.maxProgress) {
                 instance.progress = instance.maxProgress;
             }
 
+            const template = CONFIG.templates[instance.templateId];
+            
+            if (status === Q_STATUS.SUCCESS) playSe(template.seSuccess);
+            else if (status === Q_STATUS.FAIL) playSe(template.seFail);
+
             $gameSystem.requestHudRefresh();
 
-            const template = CONFIG.templates[instance.templateId];
             if (template) {
                 if (status === Q_STATUS.SUCCESS) this._evalCode(template.onSuccess, instance);
                 else if (status === Q_STATUS.FAIL) this._evalCode(template.onFail, instance);
@@ -405,8 +528,7 @@
             }
         },
 
-        // 设置某任务模板类型下 最新 一个任务的状态
-        setLatestStatus: function(templateId, status) {
+        setLatestStatus(templateId, status) {
             const instance = $gameSystem.getLatestInstance(templateId);
             if (instance) {
                 this.setStatusByUuid(instance.uuid, status);
@@ -415,42 +537,33 @@
             }
         },
 
-        // --- 进度控制接口 ---
-
-        // 设置最新任务进度
-        setLatestProgress: function(templateId, value) {
+        setLatestProgress(templateId, value) {
             const instance = $gameSystem.getLatestInstance(templateId);
             if (!instance) return;
-            
-            // 失败或归档的任务不再允许改进度
+
             if (instance.status === Q_STATUS.FAIL || instance.status === Q_STATUS.COMPLETE) return;
 
-            // 限制范围
             let newVal = value;
             if (newVal < 0) newVal = 0;
             if (newVal > instance.maxProgress) newVal = instance.maxProgress;
 
-            // 设置值
             instance.progress = newVal;
 
-            // 检查是否自动完成
             if (instance.progress >= instance.maxProgress && instance.status === Q_STATUS.RUNNING) {
                 this.setStatusByUuid(instance.uuid, Q_STATUS.SUCCESS);
             } else {
-                $gameSystem.requestHudRefresh(); // 仅刷新UI
+                $gameSystem.requestHudRefresh(); 
             }
         },
 
-        // 增加最新任务进度
-        addLatestProgress: function(templateId, amount) {
+        addLatestProgress(templateId, amount) {
             const instance = $gameSystem.getLatestInstance(templateId);
             if (instance) {
                 this.setLatestProgress(templateId, instance.progress + amount);
             }
         },
 
-        // 更新描述
-        updateLatestDesc: function(templateId, newDesc) {
+        updateLatestDesc(templateId, newDesc) {
             const instance = $gameSystem.getLatestInstance(templateId);
             if (instance) {
                 instance.desc = newDesc;
@@ -458,21 +571,65 @@
             }
         },
 
-        removeLatest: function(templateId) {
+        removeLatest(templateId) {
             const instance = $gameSystem.getLatestInstance(templateId);
             if (instance) {
                 $gameSystem.removeQuestInstance(instance.uuid);
             }
         },
 
-        refresh: function() {
+        refresh() {
             $gameSystem.requestHudRefresh();
         },
 
-        // 内部执行脚本
-        _evalCode: function(code, questInstance) {
+        // --- 查询 API (Utility Functions) ---
+
+        /**
+         * 判断任务是否处在“活跃”状态 (进行中 或 成功待提交)
+         * @param {string} templateId 
+         * @returns {boolean}
+         */
+        isActive(templateId) {
+            const instance = $gameSystem.getLatestInstance(templateId);
+            // getLatestInstance 会忽略 COMPLETE 的，但我们需要明确 RUNNING 或 SUCCESS
+            if (instance && (instance.status === Q_STATUS.RUNNING || instance.status === Q_STATUS.SUCCESS)) {
+                return true;
+            }
+            return false;
+        },
+
+        /**
+         * 判断玩家是否曾经有关于这个任务的记录 (无论现在是什么状态)
+         * @param {string} templateId 
+         * @returns {boolean}
+         */
+        hasHistory(templateId) {
+            return this.countHistory(templateId) > 0;
+        },
+
+        /**
+         * 获取该任务被领取的总次数 (包含正在进行、完成、失败的所有历史)
+         * @param {string} templateId 
+         * @returns {number}
+         */
+        countHistory(templateId) {
+            let count = 0;
+            const allQuests = $gameSystem.getAllQuests(); // 访问原始数组
+            if (!allQuests) return 0;
+            
+            for (let i = 0; i < allQuests.length; i++) {
+                if (allQuests[i].templateId === templateId) {
+                    count++;
+                }
+            }
+            return count;
+        },
+
+        // --- 内部 helper ---
+
+        _evalCode(code, questInstance) {
             if (!code || code.trim() === "") return;
-            const quest = questInstance; // 注入变量名
+            const quest = questInstance; 
             try {
                 eval(code);
             } catch (e) {
@@ -486,19 +643,19 @@
     // ======================================================================
 
     const _Game_System_initialize = Game_System.prototype.initialize;
-    Game_System.prototype.initialize = function() {
+    Game_System.prototype.initialize = function () {
         _Game_System_initialize.call(this);
-        this._questInstances = []; // 存储所有任务实例的数组
+        this._questInstances = []; 
         this._questHudVisible = true;
         this._questHudDirty = true;
     };
 
-    Game_System.prototype.addQuestInstance = function(instance) {
+    Game_System.prototype.addQuestInstance = function (instance) {
         this._questInstances.push(instance);
         this.requestHudRefresh();
     };
 
-    Game_System.prototype.removeQuestInstance = function(uuid) {
+    Game_System.prototype.removeQuestInstance = function (uuid) {
         for (let i = 0; i < this._questInstances.length; i++) {
             if (this._questInstances[i].uuid === uuid) {
                 this._questInstances.splice(i, 1);
@@ -508,14 +665,29 @@
         }
     };
 
-    Game_System.prototype.getQuestByUuid = function(uuid) {
+    Game_System.prototype.countRunningQuests = function () {
+        let count = 0;
+        for (let i = 0; i < this._questInstances.length; i++) {
+            const q = this._questInstances[i];
+            if (q.status === Q_STATUS.RUNNING || q.status === Q_STATUS.SUCCESS) {
+                count++;
+            }
+        }
+        return count;
+    };
+
+    Game_System.prototype.getAllQuests = function () {
+        return this._questInstances;
+    };
+
+    Game_System.prototype.getQuestByUuid = function (uuid) {
         for (let i = 0; i < this._questInstances.length; i++) {
             if (this._questInstances[i].uuid === uuid) return this._questInstances[i];
         }
         return null;
     };
 
-    Game_System.prototype.getLatestInstance = function(templateId) {
+    Game_System.prototype.getLatestInstance = function (templateId) {
         for (let i = this._questInstances.length - 1; i >= 0; i--) {
             if (this._questInstances[i].templateId === templateId) {
                 if (this._questInstances[i].status !== Q_STATUS.COMPLETE) {
@@ -526,7 +698,9 @@
         return null;
     };
 
-    Game_System.prototype.getHudData = function() {
+    // 该方法仅获取“应该在HUD中显示”的数据，不负责过滤Condition
+    // Condition过滤转移到 HUD update 中动态处理
+    Game_System.prototype.getHudData = function () {
         const groups = {};
         for (let i = 0; i < CONFIG.categories.length; i++) {
             groups[CONFIG.categories[i].id] = {
@@ -537,12 +711,14 @@
 
         for (let i = 0; i < this._questInstances.length; i++) {
             const q = this._questInstances[i];
+            
+            // 已归档不显示
             if (q.status === Q_STATUS.COMPLETE) continue;
 
             if (groups[q.typeId]) {
                 groups[q.typeId].items.push(q);
             } else {
-                if (!groups['_other']) groups['_other'] = { meta: { name: "其他", color: 0, fontSize: 24 }, items: [] };
+                if (!groups['_other']) groups['_other'] = { meta: { name: "其他", color: 0 }, items: [] };
                 groups['_other'].items.push(q);
             }
         }
@@ -550,7 +726,7 @@
         return groups;
     };
 
-    Game_System.prototype.requestHudRefresh = function() {
+    Game_System.prototype.requestHudRefresh = function () {
         this._questHudDirty = true;
     };
 
@@ -562,6 +738,8 @@
         constructor() {
             super();
             this.createBitmap();
+            this._checkTimer = 0;
+            this._lastVisibleState = ""; // 用于缓存可见性状态指纹
         }
 
         createBitmap() {
@@ -570,7 +748,20 @@
 
         update() {
             super.update();
+            if ($gameMap.isEventRunning()) {
+                this.visible = false;
+                return;
+            }
+            
             this.updateVisibility();
+
+            // 动态条件检测 (每30帧一次)
+            this._checkTimer++;
+            if (this._checkTimer >= 15) {
+                this._checkTimer = 0;
+                this.checkVisibilityCondition();
+            }
+
             if ($gameSystem._questHudDirty) {
                 this.refresh();
                 $gameSystem._questHudDirty = false;
@@ -578,154 +769,269 @@
         }
 
         updateVisibility() {
-            this.visible = $gameSystem._questHudVisible && $gameParty.inBattle() === false;
+            this.visible = $gameSystem._questHudVisible && !$gameMap.isEventRunning() && $gameParty.inBattle() === false;
+        }
+
+        // 检查显示条件是否有变化，如果有变化则请求重绘
+        checkVisibilityCondition() {
+            const quests = $gameSystem._questInstances;
+            let currentVisibleState = "";
+
+            // 我们遍历所有“活跃”任务，计算它们的可见性，生成一个指纹字符串
+            // 如果指纹变了，说明有任务需要显示或隐藏了
+            for (const q of quests) {
+                if (q.status === Q_STATUS.COMPLETE) continue;
+                
+                const tpl = CONFIG.templates[q.templateId];
+                let isVisible = true;
+
+                if (tpl && tpl.conditionFunc) {
+                    try {
+                        isVisible = tpl.conditionFunc.call(window);
+                    } catch (e) {
+                        isVisible = true; // Error fallback
+                    }
+                }
+                
+                // 将UUID和可见性拼接到指纹里
+                currentVisibleState += q.uuid + ":" + (isVisible ? "1" : "0") + "|";
+            }
+
+            if (this._lastVisibleState !== currentVisibleState) {
+                this._lastVisibleState = currentVisibleState;
+                $gameSystem.requestHudRefresh(); // 触发重绘
+            }
         }
 
         refresh() {
             this.bitmap.clear();
 
-            const dataGroups = $gameSystem.getHudData(); 
+            if (CONFIG.shadowDist > 0) {
+                this.bitmap.context.shadowColor = "rgba(0,0,0,0.8)";
+                this.bitmap.context.shadowBlur = 4;
+                this.bitmap.context.shadowOffsetX = CONFIG.shadowDist;
+                this.bitmap.context.shadowOffsetY = CONFIG.shadowDist;
+            }
+
+            const dataGroups = $gameSystem.getHudData();
             const sortedKeys = CONFIG.categories.map(c => c.id);
             if (dataGroups['_other']) sortedKeys.push('_other');
 
-            let dy = CONFIG.y;
-            const dx = CONFIG.x;
-            const dw = CONFIG.width;
+            const layoutInfo = [];
+            let nonEmptyGroups = 0;
+            
+            // --- 第一阶段：计算布局和总高度 ---
+            let currentTempY = CONFIG.y + CONFIG.itemPadding;
 
             for (let i = 0; i < sortedKeys.length; i++) {
                 const key = sortedKeys[i];
                 const group = dataGroups[key];
-                
                 if (!group || group.items.length === 0) continue;
 
-                this.drawGroupTitle(group.meta, dx, dy);
-                dy += 28 + 4; 
+                // 筛选可见任务
+                const visibleItems = group.items.filter(q => {
+                    const tpl = CONFIG.templates[q.templateId];
+                    if (tpl && tpl.conditionFunc) {
+                        try { return tpl.conditionFunc.call(window); } 
+                        catch (e) { return true; }
+                    }
+                    return true;
+                });
 
-                for (let k = 0; k < group.items.length; k++) {
-                    const item = group.items[k];
-                    dy = this.drawTaskItem(item, dx, dy, dw);
-                    dy += CONFIG.itemPadding;
+                if (visibleItems.length === 0) continue;
+
+                const groupStartY = currentTempY;
+                
+                // 计算该组的高度
+                let groupHeight = 32; // 标题高度
+                for (const item of visibleItems) {
+                     // 只计算高度，不绘制
+                     const h = this.drawTaskItem(item, 0, 0, CONFIG.width - CONFIG.itemPadding * 2, true);
+                     groupHeight += h + CONFIG.itemPadding;
                 }
 
-                if (i < sortedKeys.length - 1) {
-                   this.drawSeparator(dx, dy, dw);
-                   dy += CONFIG.sectionSpacing;
+                layoutInfo.push({
+                    groupMeta: group.meta,
+                    items: visibleItems,
+                    y: groupStartY,     // 记录该组的起始Y
+                    h: groupHeight      // 记录该组的总高度
+                });
+                
+                nonEmptyGroups++;
+                currentTempY += groupHeight + CONFIG.sectionSpacing; // 累加到下一个组的起始位置
+            }
+            
+            if (nonEmptyGroups === 0) return;
+
+            const totalContentHeight = currentTempY - CONFIG.sectionSpacing + CONFIG.itemPadding;
+
+            // --- 第二阶段：绘制背景 ---
+            if (CONFIG.showBg) {
+                this.drawRoundedRect(
+                    CONFIG.x, 
+                    CONFIG.y, 
+                    CONFIG.width, 
+                    totalContentHeight - CONFIG.y, 
+                    CONFIG.borderRadius, 
+                    CONFIG.bgColor
+                );
+            }
+
+            // --- 第三阶段：绘制内容 ---
+            const dx = CONFIG.x + CONFIG.itemPadding;
+            const dw = CONFIG.width - CONFIG.itemPadding * 2;
+
+            for (const layout of layoutInfo) {
+                // 使用第一阶段计算好的 Y 坐标
+                let dy = layout.y;
+
+                this.drawGroupTitle(layout.groupMeta, CONFIG.x, dy, CONFIG.width);
+                dy += 32;
+
+                for (const item of layout.items) {
+                    // 绘制并获取这一项的高度
+                    const itemH = this.drawTaskItem(item, dx, dy, dw, false);
+                    dy += itemH + CONFIG.itemPadding;
                 }
             }
         }
 
-        drawGroupTitle(meta, x, y) {
+        drawRoundedRect(x, y, w, h, r, color) {
             const ctx = this.bitmap.context;
-            const titleW = CONFIG.width;
-            if (CONFIG.showBg) {
-                ctx.fillStyle = `rgba(0, 0, 0, ${CONFIG.backOpacity / 255})`;
-                ctx.fillRect(x, y, titleW, 28);
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(x + r, y);
+            ctx.lineTo(x + w - r, y);
+            ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+            ctx.lineTo(x + w, y + h - r);
+            ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+            ctx.lineTo(x + r, y + h);
+            ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+            ctx.lineTo(x, y + r);
+            ctx.quadraticCurveTo(x, y, x + r, y);
+            ctx.closePath();
+            ctx.fillStyle = color;
+            ctx.shadowColor = "transparent";
+            ctx.fill();
+            ctx.restore();
+        }
+
+        drawGroupTitle(meta, x, y, fullWidth) {
+            if (CONFIG.headerBgColor) {
+                const hx = x + 4;
+                const hw = fullWidth - 8;
+                this.drawRoundedRect(hx, y, hw, 28, 4, CONFIG.headerBgColor);
             }
 
             this.bitmap.fontBold = true;
-            this.bitmap.fontSize = 22;
+            this.bitmap.fontSize = 18;
+            this.bitmap.outlineWidth = CONFIG.outlineWidth;
             this.bitmap.textColor = ColorManager.textColor(Number(meta.color));
-            this.bitmap.drawText(meta.name, x + 4, y + 2, titleW, 24, "left");
+            
+            if (CONFIG.shadowDist > 0) {
+                this.bitmap.context.shadowColor = "rgba(0,0,0,0.8)";
+            }
+            
+            this.bitmap.drawText(meta.name, x + 12, y + 2, fullWidth - 24, 24, "left");
             this.bitmap.fontBold = false;
         }
 
-        drawTaskItem(instance, x, y, width) {
+        processText(text, instance) {
+            if (!text) return "";
+            return text.replace(/{current}/g, instance.progress)
+                       .replace(/{max}/g, instance.maxProgress);
+        }
+
+        drawTaskItem(instance, x, y, width, dryRun = false) {
             let cy = y;
             const statusConf = CONFIG.statusText[instance.status] || { text: "", color: 0 };
-            const tpl = CONFIG.templates[instance.templateId]; // 获取静态任务模板
             
-            // 1. 计算进度文字
-            let progressStr = "";
-            if (tpl && tpl.progressFmt) {
-                // 简单的字符串替换
-                progressStr = tpl.progressFmt
-                    .replace("{current}", '' + (instance.progress || 0))
-                    .replace("{max}", '' + (instance.maxProgress || 1));
-            }
+            const displayTitle = this.processText(instance.title, instance);
+            const rewardText = CONFIG.templates[instance.templateId].rewardText;
 
-            // 绘制顺序：[进度] [状态前缀] [标题]  [---奖励]
+            this.bitmap.fontSize = 16;
+            this.bitmap.outlineWidth = CONFIG.outlineWidth;
+
+            const statusText = statusConf.text;
+            const statusWidth = this.bitmap.measureTextWidth(statusText);
             
-            this.bitmap.fontSize = 20;
-
-            let currentX = x;
-
-            // A. 绘制进度 (如果存在)
-            if (instance.status == Q_STATUS.RUNNING && progressStr) {
-                this.bitmap.textColor = ColorManager.textColor(CONFIG.colorProgress);
-                const pW = this.bitmap.measureTextWidth(progressStr);
-                this.bitmap.drawText(progressStr, currentX, cy, pW + 10, 24, "left");
-                currentX += pW + 4; // 稍微留点空隙
+            if (!dryRun) {
+                this.bitmap.textColor = ColorManager.textColor(statusConf.color);
+                this.bitmap.drawText(statusText, x, cy, width, 24, "left");
             }
+
+            const titleX = x + statusWidth; 
+            const titleTotalW = width - statusWidth;
             
-            // B. 绘制状态前缀
-            if (instance.status == Q_STATUS.RUNNING && !progressStr || instance.status != Q_STATUS.RUNNING) {
-              this.bitmap.textColor = ColorManager.textColor(statusConf.color);
-              const prefixW = this.bitmap.measureTextWidth(statusConf.text);
-              this.bitmap.drawText(statusConf.text, currentX, cy, width, 24, "left");
-              currentX += prefixW;
+            this.bitmap.textColor = ColorManager.normalColor();
+
+            const titleLines = this.wrapText(displayTitle, titleTotalW);
+            
+            let rewardW = 0;
+            if (rewardText) {
+                this.bitmap.fontSize = 14; 
+                rewardW = this.bitmap.measureTextWidth(rewardText) + 5;
+                this.bitmap.fontSize = 16; 
             }
 
-            // C. 绘制标题主体
-            this.bitmap.textColor = ColorManager.normalColor(); // White
-            // 计算剩余宽度给标题
-            const titleMaxW = width - (currentX - x) - 60; 
-            this.bitmap.drawText(" " + instance.title, currentX, cy, titleMaxW, 24, "left");
-
-            // D. 绘制奖励说明(右对齐)
-            if (tpl && tpl.rewardText) {
-                this.bitmap.fontSize = 16;
-                this.bitmap.textColor = ColorManager.systemColor(); // Blueish
-                this.bitmap.drawText(tpl.rewardText, x, cy + 2, width, 24, "right");
-            }
-
-            cy += 24;
-
-            // 2. 绘制描述 (多行文本)
-            if (instance.desc) {
-                this.bitmap.fontSize = 16;
-                this.bitmap.textColor = "rgba(255, 255, 255, 0.8)";
+            for (let i = 0; i < titleLines.length; i++) {
+                if (!dryRun) {
+                    let lineStr = titleLines[i];
+                    this.bitmap.textColor = ColorManager.normalColor();
+                    this.bitmap.drawText(lineStr, titleX, cy, titleTotalW, 24, "left");
+                }
                 
-                const lines = instance.desc.split('\n');
-                for (let l = 0; l < lines.length; l++) {
-                    const lineStr = lines[l];
-                    // 缩进一点
-                    cy = this.drawWrappedText(lineStr, x + 10, cy, width - 10, 20);
+                if (i === titleLines.length - 1 && rewardText) {
+                    if (!dryRun) {
+                        this.bitmap.fontSize = 14;
+                        this.bitmap.textColor = ColorManager.systemColor(); 
+                        this.bitmap.drawText(rewardText, x, cy + 2, width, 24, "right");
+                        this.bitmap.fontSize = 16; 
+                    }
+                }
+                cy += 24;
+            }
+
+            if (instance.desc) {
+                this.bitmap.fontSize = 13;
+                this.bitmap.textColor = "rgba(220, 220, 220, 0.9)";
+                
+                const processDesc = this.processText(instance.desc, instance);
+                const descLines = processDesc.split('\n');
+                
+                for (let l = 0; l < descLines.length; l++) {
+                    const rawLine = descLines[l];
+                    const wrappedDescLines = this.wrapText(rawLine, width - 10);
+                    
+                    for (let wl = 0; wl < wrappedDescLines.length; wl++) {
+                        if (!dryRun) {
+                            this.bitmap.drawText(wrappedDescLines[wl], x + 10, cy, width - 10, 20, "left");
+                        }
+                        cy += 20;
+                    }
                 }
             }
-            
-            return cy;
+
+            return cy - y; // Return height
         }
 
-        drawWrappedText(text, x, y, maxWidth, lineHeight) {
-            let line = "";
-            let currentY = y;
-            const words = text.split(""); 
-            
-            for (let n = 0; n < words.length; n++) {
-                const testLine = line + words[n];
-                const testWidth = this.bitmap.measureTextWidth(testLine);
-                if (testWidth > maxWidth && n > 0) {
-                    this.bitmap.drawText(line, x, currentY, maxWidth, lineHeight, "left");
-                    line = words[n];
-                    currentY += lineHeight;
+        wrapText(text, maxWidth) {
+            const words = text.split("");
+            let lines = [];
+            let currentLine = words[0];
+
+            for (let i = 1; i < words.length; i++) {
+                const word = words[i];
+                const width = this.bitmap.measureTextWidth(currentLine + word);
+                if (width < maxWidth) {
+                    currentLine += word;
                 } else {
-                    line = testLine;
+                    lines.push(currentLine);
+                    currentLine = word;
                 }
             }
-            this.bitmap.drawText(line, x, currentY, maxWidth, lineHeight, "left");
-            return currentY + lineHeight;
-        }
-
-        drawSeparator(x, y, w) {
-            const ctx = this.bitmap.context;
-            ctx.save();
-            ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.moveTo(x, y + 10);
-            ctx.lineTo(x + w, y + 10);
-            ctx.stroke();
-            ctx.restore();
+            lines.push(currentLine);
+            return lines;
         }
     }
 
@@ -734,12 +1040,12 @@
     // ======================================================================
 
     const _Spriteset_Map_createLowerLayer = Spriteset_Map.prototype.createLowerLayer;
-    Spriteset_Map.prototype.createLowerLayer = function() {
+    Spriteset_Map.prototype.createLowerLayer = function () {
         _Spriteset_Map_createLowerLayer.call(this);
         this.createQuestHud();
     };
 
-    Spriteset_Map.prototype.createQuestHud = function() {
+    Spriteset_Map.prototype.createQuestHud = function () {
         if (this._questHud) return;
         this._questHud = new Sprite_QuestHUD();
         this.addChild(this._questHud);
@@ -758,18 +1064,16 @@
         let s = 0;
         if (args.status === 'success') s = 1;
         else if (args.status === 'fail') s = 2;
-        else if (args.status === 'complete') s = 3; 
-        
+        else if (args.status === 'complete') s = 3;
+
         window.SimpleQuest.setLatestStatus(args.templateId, s);
     });
 
-    // 新增：增加进度
     PluginManager.registerCommand(PLUGIN_NAME, "AddProgress", args => {
         const val = Number(args.value || 1);
         window.SimpleQuest.addLatestProgress(args.templateId, val);
     });
 
-    // 新增：设置进度
     PluginManager.registerCommand(PLUGIN_NAME, "SetProgress", args => {
         const val = Number(args.value || 0);
         window.SimpleQuest.setLatestProgress(args.templateId, val);
