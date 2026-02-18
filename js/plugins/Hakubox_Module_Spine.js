@@ -478,6 +478,12 @@
  * @desc 在这些场景中，此图层会自动显示。
  * @type text[]
  * @default ["Scene_Map"]
+ * 
+ * @param maps
+ * @text 限定的显示地图ID列表
+ * @desc 在这些地图ID中，此图层会自动显示。如果为空则不限制（但仍受Scenes限制）。
+ * @type number[]
+ * @default []
  */
 
 (() => {
@@ -502,7 +508,8 @@
     // defaultSkins: config.defaultSkins ? config.defaultSkins.split(',').map(s => s.trim()) : [],
     animationSpeed: Number(config.animationSpeed || 1.0),
     initiallyVisible: config.initiallyVisible === 'true',
-    scenes: JSON.parse(config.scenes || '[]')
+    scenes: JSON.parse(config.scenes || '[]'),
+    maps: JSON.parse(config.maps || '[]').map(Number) // 解析地图ID数组
   }));
 
   const backgroundConfigs = parseList(parameters.backgroundList);
@@ -706,66 +713,102 @@
   Scene_Map.prototype.loadSceneElements = function () {
     this.clearAllSceneElements();
     const sceneName = SceneManager._scene.constructor.name;
+    const currentMapId = $gameMap.mapId(); // 获取当前地图ID
+
     // Load Spines (Spine逻辑保持不变)
     spineConfigs.forEach(config => {
       if (config.scenes.includes(sceneName)) {
         this.createAndAddSpine(config);
       }
     });
+
     // ———— 修改开始：BG 背景逻辑 ————
-    const savedBg = $gameData.haku_bg_info; // 读取已经保存的背景信息
-    if (savedBg) {
-      // 如果有保存的信息，且标记为可见，则加载它
-      if (savedBg.visible) {
-        this.createAndAddLayerImage(this._spineBackgroundContainer, savedBg);
+    // 1. 查找当前地图是否有匹配的配置
+    let matchedBgConfig = null;
+    backgroundConfigs.some(config => {
+      if (config.scenes.includes(sceneName)) {
+        // 如果maps为空或者包含当前mapId，则匹配成功
+        if (!config.maps || config.maps.length === 0 || config.maps.includes(currentMapId)) {
+          matchedBgConfig = config;
+          return true; // 找到即停止，优先取列表上方的配置
+        }
       }
-      // 如果 savedBg.visible 为 false，则此处什么都不做（覆盖了插件参数，达成“关闭后不自动打开”）
-    } else {
-      // 如果从未手动操作过（savedBg 为空），则走默认插件参数
-      backgroundConfigs.forEach(config => {
-        if (config.scenes.includes(sceneName)) {
-          if (!$gameData.haku_bg_info) {
-            $gameData.haku_bg_info = {
-              imageFile: config.imageFile,
-              x: Number(config.x || 0),
-              y: Number(config.y || 0),
-              width: Number(config.width || 0),
-              height: Number(config.height || 0),
-              visible: true // 默认配置肯定是可见的
-            };
-          }
-          if ($gameData.haku_bg_info.visible) {
+      return false;
+    });
+
+    // 2. 判断是否需要更新显示
+    if ($gameData.haku_bg_info) {
+        // 该逻辑处理：如果在旧地图没显示（visible=false），到新地图也不显示。
+        // 如果在旧地图显示了（visible=true），到新地图自动切换背景。
+        if ($gameData.haku_bg_info.visible) {
+            // 如果找到了新的配置，且跟当前保存的图片不一致（或单纯为了刷新位置），应用它
+            if (matchedBgConfig) {
+                 $gameData.haku_bg_info = {
+                     imageFile: matchedBgConfig.imageFile,
+                     x: Number(matchedBgConfig.x || 0),
+                     y: Number(matchedBgConfig.y || 0),
+                     width: Number(matchedBgConfig.width || 0),
+                     height: Number(matchedBgConfig.height || 0),
+                     visible: true
+                 };
+            }
+            // 无论是沿用旧背景还是切换了新背景，只要 visible 是 true，就执行加载
             this.createAndAddLayerImage(this._spineBackgroundContainer, $gameData.haku_bg_info);
-          }
         }
-      });
-    }
-    // ———— 修改开始：FG 前景逻辑 ————
-    const savedFg = $gameData.haku_fg_info; // 读取已经保存的前景信息
-    if (savedFg) {
-      // 如果有保存的信息，且标记为可见，则加载它
-      if (savedFg.visible) {
-        this.createAndAddLayerImage(this._spineForegroundContainer, savedFg);
-      }
     } else {
-      // 默认插件参数
-      foregroundConfigs.forEach(config => {
-        if (config.scenes.includes(sceneName)) {
-          if (!$gameData.haku_fg_info) {
-            $gameData.haku_fg_info = {
-              imageFile: config.imageFile,
-              x: Number(config.x || 0),
-              y: Number(config.y || 0),
-              width: Number(config.width || 0),
-              height: Number(config.height || 0),
-              visible: true
+        // 如果从未手动操作过（$gameData.haku_bg_info 为空），完全走配置
+        // 这种情况通常是第一次进入游戏，或者还没用过背景功能
+        if (matchedBgConfig) {
+            $gameData.haku_bg_info = {
+                imageFile: matchedBgConfig.imageFile,
+                x: Number(matchedBgConfig.x || 0),
+                y: Number(matchedBgConfig.y || 0),
+                width: Number(matchedBgConfig.width || 0),
+                height: Number(matchedBgConfig.height || 0),
+                visible: true 
             };
-          }
-          if ($gameData.haku_fg_info.visible) {
-            this.createAndAddLayerImage(this._spineForegroundContainer, $gameData.haku_fg_info);
-          }
+            this.createAndAddLayerImage(this._spineBackgroundContainer, $gameData.haku_bg_info);
         }
-      });
+    }
+
+    // ———— 修改开始：FG 前景逻辑 (逻辑同背景) ————
+    let matchedFgConfig = null;
+    foregroundConfigs.some(config => {
+        if (config.scenes.includes(sceneName)) {
+            if (!config.maps || config.maps.length === 0 || config.maps.includes(currentMapId)) {
+                matchedFgConfig = config;
+                return true;
+            }
+        }
+        return false;
+    });
+
+    if ($gameData.haku_fg_info) {
+        if ($gameData.haku_fg_info.visible) {
+             if (matchedFgConfig) {
+                 $gameData.haku_fg_info = {
+                     imageFile: matchedFgConfig.imageFile,
+                     x: Number(matchedFgConfig.x || 0),
+                     y: Number(matchedFgConfig.y || 0),
+                     width: Number(matchedFgConfig.width || 0),
+                     height: Number(matchedFgConfig.height || 0),
+                     visible: true
+                 };
+             }
+            this.createAndAddLayerImage(this._spineForegroundContainer, $gameData.haku_fg_info);
+        }
+    } else {
+        if (matchedFgConfig) {
+            $gameData.haku_fg_info = {
+                imageFile: matchedFgConfig.imageFile,
+                x: Number(matchedFgConfig.x || 0),
+                y: Number(matchedFgConfig.y || 0),
+                width: Number(matchedFgConfig.width || 0),
+                height: Number(matchedFgConfig.height || 0),
+                visible: true
+            };
+            this.createAndAddLayerImage(this._spineForegroundContainer, $gameData.haku_fg_info);
+        }
     }
   };
 

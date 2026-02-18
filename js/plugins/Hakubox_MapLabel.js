@@ -503,17 +503,29 @@
         }
     };
 
+    // Game_Event.prototype.refresh = function() {
     // --- Game_Event 备注解析 (v2.1) ---
     const _Game_Event_setupPage = Game_Event.prototype.setupPage;
     Game_Event.prototype.setupPage = function () {
         _Game_Event_setupPage.call(this);
         this.setupLabelData(this);
     };
+
+    // 清理缓存（确保切换页面时不留垃圾）
+    const _Game_Event_clearPageSettings = Game_Event.prototype.clearPageSettings;
+    Game_Event.prototype.clearPageSettings = function() {
+        _Game_Event_clearPageSettings.call(this);
+        this._labelDataList = [];
+        this._labelCondCache = {}; // 新增：用来存放编译好的函数缓存
+    };
     
     // --- [修改] Game_Event 读取多个标签 ---
     Game_Event.prototype.setupLabelData = function (gameEvent) {
         this._labelDataList = []; 
         if (!this.page()) return;
+
+        if (!this._labelCondCache) this._labelCondCache = {};
+
         const note = this.event().note || "";
         const regex = /<label:\s*(.+?)>/gi;
         let match;
@@ -546,16 +558,34 @@
             }
             // 获取条件字符串，并立即编译成函数缓存起来
             const conditionStr = parts[4] || "";
-            const conditionFunc = createLabelConditionFunc(conditionStr, gameEvent);
+            // const conditionFunc = createLabelConditionFunc(conditionStr, gameEvent);
             this._labelDataList.push({
                 text: text,
                 type: type,
                 dir: dir,
                 manualOx: offX,
                 manualOy: offY,
-                _condFunc: conditionFunc // 存储编译好的函数
+                condStr: conditionStr,
+                // _condFunc: conditionFunc // 存储编译好的函数
             });
         }
+    };
+
+    Game_Event.prototype.evalLabelCondition = function(condStr) {
+        if (!condStr) return true; // 无条件则通过
+        // 1. 初始化缓存容器（读档兼容）
+        if (!this._labelCondCache) this._labelCondCache = {};
+        // 2. 检查缓存中是否有编译好的函数
+        if (!this._labelCondCache[condStr]) {
+            // 没有则编译（读档后第一次走到这里会自动修复）
+            this._labelCondCache[condStr] = createLabelConditionFunc(condStr, this);
+        }
+        // 3. 执行缓存的函数
+        const func = this._labelCondCache[condStr];
+        if (typeof func === 'function') {
+            return func.call(this);
+        }
+        return true;
     };
 
     // 新增获取列表的方法
@@ -839,12 +869,16 @@
                 this.visible = false;
                 return;
             }
-            // --- [修改点] 高效执行条件 ---
-            // 如果存在 _condFunc，则执行之。
-            // 使用 .call(this._character) 将 this 指向当前的 Game_Event
-            if (data._condFunc) {
-                // 执行函数。如果返回 false，则隐藏
-                if (!data._condFunc.call(this._character)) {
+
+            // 1. 检查是否有条件字符串
+            if (data.condStr) {
+                // 2. 检查当前 Sprite 是否持有编译好的函数？
+                if (!this._cachedCondFunc) {
+                    // 现场恢复！仅执行一次，之后每帧直接复用
+                    this._cachedCondFunc = createLabelConditionFunc(data.condStr, this._character);
+                }
+                // 3. 直接执行函数 (这是最快的调用方式)
+                if (this._cachedCondFunc && !this._cachedCondFunc.call(this._character)) {
                     this.visible = false;
                     return;
                 }
@@ -1077,7 +1111,20 @@
         // ------------------------------------
 
         setTargetData(data) {
-            this._assignedData = data;
+            // 如果数据引用变了，说明 Event 页可能变了，或者刚刚初始化
+            if (this._assignedData !== data) {
+                this._assignedData = data;
+                
+                // [优化关键] 清除旧的函数缓存
+                this._cachedCondFunc = null; 
+                
+                // 如果有条件字符串，尝试立即编译（针对新创建/切地图的情况）
+                // 读档时这里不会执行，因为 setupPage 没跑，setTargetData 也没跑
+                // 但没关系，update 里有保底机制
+                if (data && data.condStr) {
+                    this._cachedCondFunc = createLabelConditionFunc(data.condStr, this._character);
+                }
+            }
         };
     }
 
