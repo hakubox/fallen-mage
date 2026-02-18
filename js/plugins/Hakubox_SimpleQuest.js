@@ -58,7 +58,7 @@
  * @desc 玩家身上同时存在的任务总数上限(-1为不限制)。
  * @type number
  * @min -1
- * @default 5
+ * @default -1
  *
  * @param itemPadding
  * @text 任务内容内边距
@@ -92,7 +92,7 @@
  * @type number
  * @default 8
  *
- * @param ---文字效果---
+ * @param ==== 文字效果 ====
  * 
  * @param fontOutlineWidth
  * @text 文字描边宽度
@@ -111,7 +111,7 @@
  * @type string
  * @default #000000
  *
- * @param ---显示控制---
+ * @param ==== 显示控制 ====
  *
  * @param visibleSwitchId
  * @text 显示开关ID
@@ -119,7 +119,7 @@
  * @type switch
  * @default 0
  *
- * @param ---全局音效配置---
+ * @param ==== 全局音效配置 ====
  * @desc 如果任务模板里没配音频，则使用这里的默认音频。
  *
  * @param seAccept
@@ -137,7 +137,7 @@
  * @type file
  * @dir audio/se/
  *
- * @param ---状态前缀文本---
+ * @param ==== 状态前缀文本 ====
  *
  * @param textRunning
  * @text [进行中] 前缀
@@ -169,7 +169,7 @@
  * @type number
  * @default 10
  *
- * @param ---数据配置---
+ * @param ==== 数据配置 ====
  *
  * @param categoryList
  * @text 1. 分组类型配置
@@ -820,8 +820,18 @@
             const mY = TouchInput.y;
             const mouseIn = mX > hudX && mX < hudX + hudW && mY > hudY && mY < hudY + hudH;
 
+            // 3. [新增] 检测地图名称显示窗口
+            let mapNameActive = false;
+            if (SceneManager._scene instanceof Scene_Map && SceneManager._scene._mapNameWindow) {
+                const mapW = SceneManager._scene._mapNameWindow;
+                // 只有当窗口打开度大于0，且内容不透明度大于0时，才视为正在显示
+                if (mapW.openness > 0 && mapW.contentsOpacity > 0) {
+                    mapNameActive = true;
+                }
+            }
+
             // 逻辑: 如果有干扰，目标透明度降低，否则恢复到 255
-            if (playerIn || mouseIn) {
+            if (playerIn || mouseIn || mapNameActive) {
                 this._targetOpacity = 80; 
             } else {
                 this._targetOpacity = 255;
@@ -829,10 +839,10 @@
 
             // 渐变处理 (简单的插值)
             if (this.opacity > this._targetOpacity) {
-                this.opacity -= 10;
+                this.opacity -= 20;
                 if (this.opacity < this._targetOpacity) this.opacity = this._targetOpacity;
             } else if (this.opacity < this._targetOpacity) {
-                this.opacity += 10;
+                this.opacity += 20;
                 if (this.opacity > this._targetOpacity) this.opacity = this._targetOpacity;
             }
         }
