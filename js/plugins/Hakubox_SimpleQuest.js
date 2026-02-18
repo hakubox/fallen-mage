@@ -104,6 +104,20 @@
  * @desc 0为不显示阴影
  * @type number
  * @default 1
+ * 
+ * @param fontOutlineColor
+ * @text 文字描边/阴影颜色
+ * @desc 格式：#000000 或 rgba(0,0,0,0.8)。
+ * @type string
+ * @default #000000
+ *
+ * @param ---显示控制---
+ *
+ * @param visibleSwitchId
+ * @text 显示开关ID
+ * @desc 指定一个开关ID(1, 2...)。若设置不为0，则该开关开启时显示，关闭时隐藏。
+ * @type switch
+ * @default 0
  *
  * @param ---全局音效配置---
  * @desc 如果任务模板里没配音频，则使用这里的默认音频。
@@ -387,6 +401,8 @@
         
         outlineWidth: Number(PARAMS['fontOutlineWidth'] || 3),
         shadowDist: Number(PARAMS['fontShadowDistance'] || 1),
+        outlineColor: PARAMS['fontOutlineColor'] || '#000000',
+        visibleSwitchId: Number(PARAMS['visibleSwitchId'] || 0),
 
         globalSe: {
             accept: PARAMS['seAccept'],
@@ -733,13 +749,13 @@
     // ======================================================================
     // 3. 核心显示组件 (Sprite_QuestHUD)
     // ======================================================================
-
     class Sprite_QuestHUD extends Sprite {
         constructor() {
             super();
             this.createBitmap();
             this._checkTimer = 0;
-            this._lastVisibleState = ""; // 用于缓存可见性状态指纹
+            this._lastVisibleState = ""; 
+            this._targetOpacity = 255; // 目标不透明度
         }
 
         createBitmap() {
@@ -748,14 +764,17 @@
 
         update() {
             super.update();
-            if ($gameMap.isEventRunning()) {
-                this.visible = false;
-                return;
-            }
             
+            // 1. 处理基础可见性 (事件中隐藏 / 战斗中隐藏 / 开关控制)
             this.updateVisibility();
 
-            // 动态条件检测 (每30帧一次)
+            // 如果已经隐藏，就不跑后面的逻辑了
+            if (!this.visible) return;
+
+            // 2. 处理鼠标/玩家接触后的透明度渐变
+            this.updateOpacityInteraction();
+
+            // 3. 动态条件检测 (每30帧一次)
             this._checkTimer++;
             if (this._checkTimer >= 15) {
                 this._checkTimer = 0;
@@ -769,18 +788,61 @@
         }
 
         updateVisibility() {
-            this.visible = $gameSystem._questHudVisible && !$gameMap.isEventRunning() && $gameParty.inBattle() === false;
+            // 新增：开关控制 (优先级最高，如果开关关闭，直接隐藏)
+            if (CONFIG.visibleSwitchId && !$gameSwitches.value(CONFIG.visibleSwitchId)) {
+                this.visible = false;
+                return;
+            }
+
+            // 基本逻辑：系统允许 && 非事件流 && 非战斗
+            this.visible = $gameSystem._questHudVisible && !$gameMap.isEventRunning() && !$gameParty.inBattle();
         }
 
-        // 检查显示条件是否有变化，如果有变化则请求重绘
+        // 新增：检测玩家或鼠标是否并在区域内
+        updateOpacityInteraction() {
+            // HUD 区域判定
+            // 注意：因为我们是根据内容绘制的，背景高度是动态的。
+            // 这里为了简单，我们假设高度覆盖到屏幕下半部分或者根据上次绘制的高度。
+            // 为了准确，我们在 refresh() 里记录一下真实的 height。
+            const hudX = CONFIG.x;
+            const hudY = CONFIG.y;
+            const hudW = CONFIG.width;
+            const hudH = this._contentHeight || 600; // 如果没画过，默认一个值
+
+            // 1. 检测玩家位置 (将瓦片坐标转为屏幕坐标)
+            const pX = $gamePlayer.screenX();
+            const pY = $gamePlayer.screenY();
+            // 简单的矩形碰撞
+            const playerIn = pX > hudX && pX < hudX + hudW && pY > hudY && pY < hudY + hudH;
+
+            // 2. 检测鼠标位置
+            const mX = TouchInput.x;
+            const mY = TouchInput.y;
+            const mouseIn = mX > hudX && mX < hudX + hudW && mY > hudY && mY < hudY + hudH;
+
+            // 逻辑: 如果有干扰，目标透明度降低，否则恢复到 255
+            if (playerIn || mouseIn) {
+                this._targetOpacity = 80; 
+            } else {
+                this._targetOpacity = 255;
+            }
+
+            // 渐变处理 (简单的插值)
+            if (this.opacity > this._targetOpacity) {
+                this.opacity -= 10;
+                if (this.opacity < this._targetOpacity) this.opacity = this._targetOpacity;
+            } else if (this.opacity < this._targetOpacity) {
+                this.opacity += 10;
+                if (this.opacity > this._targetOpacity) this.opacity = this._targetOpacity;
+            }
+        }
+
         checkVisibilityCondition() {
             const quests = $gameSystem._questInstances;
             let currentVisibleState = "";
 
-            // 我们遍历所有“活跃”任务，计算它们的可见性，生成一个指纹字符串
-            // 如果指纹变了，说明有任务需要显示或隐藏了
             for (const q of quests) {
-                if (q.status === Q_STATUS.COMPLETE) continue;
+                if (q.status === 3) continue; // COMPLETE
                 
                 const tpl = CONFIG.templates[q.templateId];
                 let isVisible = true;
@@ -789,25 +851,27 @@
                     try {
                         isVisible = tpl.conditionFunc.call(window);
                     } catch (e) {
-                        isVisible = true; // Error fallback
+                        isVisible = true; 
                     }
                 }
                 
-                // 将UUID和可见性拼接到指纹里
                 currentVisibleState += q.uuid + ":" + (isVisible ? "1" : "0") + "|";
             }
 
             if (this._lastVisibleState !== currentVisibleState) {
                 this._lastVisibleState = currentVisibleState;
-                $gameSystem.requestHudRefresh(); // 触发重绘
+                $gameSystem.requestHudRefresh(); 
             }
         }
 
         refresh() {
             this.bitmap.clear();
 
+            // 新增：应用全局描边/阴影颜色配置
+            this.bitmap.outlineColor = CONFIG.outlineColor;
+            
             if (CONFIG.shadowDist > 0) {
-                this.bitmap.context.shadowColor = "rgba(0,0,0,0.8)";
+                this.bitmap.context.shadowColor = CONFIG.outlineColor; // 使用配置的颜色作为阴影色
                 this.bitmap.context.shadowBlur = 4;
                 this.bitmap.context.shadowOffsetX = CONFIG.shadowDist;
                 this.bitmap.context.shadowOffsetY = CONFIG.shadowDist;
@@ -828,7 +892,6 @@
                 const group = dataGroups[key];
                 if (!group || group.items.length === 0) continue;
 
-                // 筛选可见任务
                 const visibleItems = group.items.filter(q => {
                     const tpl = CONFIG.templates[q.templateId];
                     if (tpl && tpl.conditionFunc) {
@@ -842,10 +905,8 @@
 
                 const groupStartY = currentTempY;
                 
-                // 计算该组的高度
-                let groupHeight = 32; // 标题高度
+                let groupHeight = 32; 
                 for (const item of visibleItems) {
-                     // 只计算高度，不绘制
                      const h = this.drawTaskItem(item, 0, 0, CONFIG.width - CONFIG.itemPadding * 2, true);
                      groupHeight += h + CONFIG.itemPadding;
                 }
@@ -853,19 +914,25 @@
                 layoutInfo.push({
                     groupMeta: group.meta,
                     items: visibleItems,
-                    y: groupStartY,     // 记录该组的起始Y
-                    h: groupHeight      // 记录该组的总高度
+                    y: groupStartY,
+                    h: groupHeight
                 });
                 
                 nonEmptyGroups++;
-                currentTempY += groupHeight + CONFIG.sectionSpacing; // 累加到下一个组的起始位置
+                currentTempY += groupHeight + CONFIG.sectionSpacing;
             }
             
-            if (nonEmptyGroups === 0) return;
+            // 记录真实内容高度，供鼠标检测使用
+            this._contentHeight = currentTempY - CONFIG.y;
+
+            if (nonEmptyGroups === 0) {
+                this._contentHeight = 0;
+                return;
+            }
 
             const totalContentHeight = currentTempY - CONFIG.sectionSpacing + CONFIG.itemPadding;
 
-            // --- 第二阶段：绘制背景 ---
+            // --- 第二阶段：绘制背景 (含修改1：渐变背景) ---
             if (CONFIG.showBg) {
                 this.drawRoundedRect(
                     CONFIG.x, 
@@ -882,24 +949,25 @@
             const dw = CONFIG.width - CONFIG.itemPadding * 2;
 
             for (const layout of layoutInfo) {
-                // 使用第一阶段计算好的 Y 坐标
                 let dy = layout.y;
 
                 this.drawGroupTitle(layout.groupMeta, CONFIG.x, dy, CONFIG.width);
                 dy += 32;
 
                 for (const item of layout.items) {
-                    // 绘制并获取这一项的高度
                     const itemH = this.drawTaskItem(item, dx, dy, dw, false);
                     dy += itemH + CONFIG.itemPadding;
                 }
             }
         }
 
+        // 修改1: 背景渐变实现
         drawRoundedRect(x, y, w, h, r, color) {
             const ctx = this.bitmap.context;
             ctx.save();
             ctx.beginPath();
+            
+            // 绘制圆角路径
             ctx.moveTo(x + r, y);
             ctx.lineTo(x + w - r, y);
             ctx.quadraticCurveTo(x + w, y, x + w, y + r);
@@ -910,7 +978,21 @@
             ctx.lineTo(x, y + r);
             ctx.quadraticCurveTo(x, y, x + r, y);
             ctx.closePath();
-            ctx.fillStyle = color;
+            // --- 修改开始：创建渐变填充 ---
+            // 创建从左(x)到右(x+w)的线性渐变
+            const gradient = ctx.createLinearGradient(x, y, x + w, y);
+            
+            // 起始点：使用设定颜色
+            gradient.addColorStop(0, color);
+            
+            // 稍微靠右的位置保持一定可见度，防止文字看不清
+            gradient.addColorStop(0.3, color); 
+            // 终点：完全透明
+            // 注意：这里简单处理为透明。如果color是rgba格式，最好提取rgb值，
+            // 但为了兼容性，设为完全透明的任意颜色即可，Canvas会自动处理过渡。
+            gradient.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = gradient;
+            // --- 修改结束 ---
             ctx.shadowColor = "transparent";
             ctx.fill();
             ctx.restore();
@@ -924,7 +1006,7 @@
             }
 
             this.bitmap.fontBold = true;
-            this.bitmap.fontSize = 18;
+            this.bitmap.fontSize = 16;
             this.bitmap.outlineWidth = CONFIG.outlineWidth;
             this.bitmap.textColor = ColorManager.textColor(Number(meta.color));
             
@@ -939,18 +1021,24 @@
         processText(text, instance) {
             if (!text) return "";
             return text.replace(/{current}/g, instance.progress)
-                       .replace(/{max}/g, instance.maxProgress);
+                       .replace(/{max}/g, instance.maxProgress)
+                       .replace(/{remain}/g, instance.maxProgress - instance.progress)
+                       .replace(/{percent}/g, Math.floor(instance.progress / instance.maxProgress * 100));
         }
 
+        // 修改2 & 3: 标题换行修复 & 失败删除线
         drawTaskItem(instance, x, y, width, dryRun = false) {
             let cy = y;
             const statusConf = CONFIG.statusText[instance.status] || { text: "", color: 0 };
+            const isFailed = (instance.status === 2); // 状态2为失败
             
             const displayTitle = this.processText(instance.title, instance);
             const rewardText = CONFIG.templates[instance.templateId].rewardText;
 
-            this.bitmap.fontSize = 16;
+            // 1. 绘制状态前缀
+            this.bitmap.fontSize = 15;
             this.bitmap.outlineWidth = CONFIG.outlineWidth;
+            this.bitmap.outlineColor = CONFIG.outlineColor; // 使用配置颜色
 
             const statusText = statusConf.text;
             const statusWidth = this.bitmap.measureTextWidth(statusText);
@@ -960,28 +1048,65 @@
                 this.bitmap.drawText(statusText, x, cy, width, 24, "left");
             }
 
-            const titleX = x + statusWidth; 
-            const titleTotalW = width - statusWidth;
+            // 2. 准备绘制标题 (换行修复逻辑)
+            const titleFirstLineX = x + statusWidth; 
+            const titleMaxW = width - statusWidth; 
             
-            this.bitmap.textColor = ColorManager.normalColor();
+            this.bitmap.textColor = isFailed ? ColorManager.textColor(8) : ColorManager.normalColor();
 
-            const titleLines = this.wrapText(displayTitle, titleTotalW);
+            // 构建行数组：第一行跟在前缀后，后续行顶格
+            const fullTitleLines = [];
+            let remainingText = displayTitle;
             
-            let rewardW = 0;
-            if (rewardText) {
-                this.bitmap.fontSize = 14; 
-                rewardW = this.bitmap.measureTextWidth(rewardText) + 5;
-                this.bitmap.fontSize = 16; 
+            // 计算第一行
+            let firstLineText = "";
+            let i = 0;
+            while (i < remainingText.length) {
+                if (this.bitmap.measureTextWidth(firstLineText + remainingText[i]) <= titleMaxW) {
+                    firstLineText += remainingText[i];
+                    i++;
+                } else {
+                    break;
+                }
+            }
+            fullTitleLines.push(firstLineText);
+            remainingText = remainingText.substring(i);
+
+            // 如果还有剩余，按完整宽度切分
+            if (remainingText.length > 0) {
+                const otherLines = this.wrapText(remainingText, width);
+                fullTitleLines.push(...otherLines);
             }
 
-            for (let i = 0; i < titleLines.length; i++) {
+            // 3. 绘制标题循环
+            for (let i = 0; i < fullTitleLines.length; i++) {
+                const lineStr = fullTitleLines[i];
+                const drawX = (i === 0) ? titleFirstLineX : x; 
+                const drawW = (i === 0) ? titleMaxW : width;
+
                 if (!dryRun) {
-                    let lineStr = titleLines[i];
-                    this.bitmap.textColor = ColorManager.normalColor();
-                    this.bitmap.drawText(lineStr, titleX, cy, titleTotalW, 24, "left");
+                    this.bitmap.drawText(lineStr, drawX, cy, drawW, 24, "left");
+
+                    // --- 失败状态画删除线 ---
+                    if (isFailed) {
+                        const lineWidth = this.bitmap.measureTextWidth(lineStr);
+                        const ctx = this.bitmap.context;
+                        ctx.save();
+                        ctx.strokeStyle = this.bitmap.textColor; // 线条颜色同文字
+                        ctx.lineWidth = 2;
+                        // 清除阴影防止线条太粗
+                        ctx.shadowColor = "transparent"; 
+                        ctx.beginPath();
+                        const lineY = cy + 12; 
+                        ctx.moveTo(drawX, lineY);
+                        ctx.lineTo(drawX + lineWidth, lineY);
+                        ctx.stroke();
+                        ctx.restore();
+                    }
                 }
                 
-                if (i === titleLines.length - 1 && rewardText) {
+                // 绘制奖励文本 (只在最后一行)
+                if (i === fullTitleLines.length - 1 && rewardText) {
                     if (!dryRun) {
                         this.bitmap.fontSize = 14;
                         this.bitmap.textColor = ColorManager.systemColor(); 
@@ -989,9 +1114,10 @@
                         this.bitmap.fontSize = 16; 
                     }
                 }
-                cy += 24;
+                cy += 24; 
             }
 
+            // 4. 绘制描述
             if (instance.desc) {
                 this.bitmap.fontSize = 13;
                 this.bitmap.textColor = "rgba(220, 220, 220, 0.9)";
@@ -1012,11 +1138,12 @@
                 }
             }
 
-            return cy - y; // Return height
+            return cy - y; 
         }
 
         wrapText(text, maxWidth) {
-            const words = text.split("");
+            if (!text) return [];
+            const words = text.split(""); 
             let lines = [];
             let currentLine = words[0];
 
