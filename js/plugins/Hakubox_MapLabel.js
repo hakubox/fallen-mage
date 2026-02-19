@@ -653,7 +653,7 @@
             const tempBitmap = new Bitmap(1, 1);
             tempBitmap.fontFace = fontFace;
             tempBitmap.fontSize = fontSize;
-            const textWidth = tempBitmap.measureTextWidth(this._text) + 4; 
+            const textWidth = tempBitmap.measureTextWidth(TranslateUtils.getText(this._text)) + 4; 
             const textHeight = fontSize + 4; 
 
             const decoName = style.decoImage;
@@ -798,7 +798,7 @@
                 tBmp.context.shadowOffsetY = 2;
             }
 
-            tBmp.drawText(this._text, 0, 0, tBmp.width, tBmp.height, style.textAlign || 'center');
+            tBmp.drawText(TranslateUtils.getText(this._text), 0, 0, tBmp.width, tBmp.height, style.textAlign || 'center');
             tBmp.context.shadowColor = "transparent";
             this._textSprite.bitmap = tBmp;
 

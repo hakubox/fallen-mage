@@ -312,8 +312,8 @@ Hakubox.HistoryLog = {};
     Game_Message.prototype.add = function(text) {
         if (text && (Config.disableSwitch === 0 || !$gameSwitches.value(Config.disableSwitch))) {
              $gameSystem.addHistoryLog('dialogue', {
-                text: text, 
-                name: this.speakerName(),
+                text: TranslateUtils.getText(text), 
+                name: TranslateUtils.getText(this.speakerName()),
                 faceName: this.faceName(),
                 faceIndex: this.faceIndex()
             });
@@ -328,7 +328,7 @@ Hakubox.HistoryLog = {};
         if (Config.templates['map_move']) {
             const dName = $gameMap.displayName();
             if (dName) {
-                $gameSystem.addHistoryLog('map_move', { arg1: dName });
+                $gameSystem.addHistoryLog('map_move', { arg1: TranslateUtils.getText(dName) });
             }
         }
     };
@@ -341,7 +341,7 @@ Hakubox.HistoryLog = {};
         if (this._list && this._list[idx]) {
             const txt = this._list[idx].name; 
             if (Config.templates['choice']) {
-                $gameSystem.addHistoryLog('choice', { arg1: txt });
+                $gameSystem.addHistoryLog('choice', { arg1: TranslateUtils.getText(txt) });
             }
         }
         _Window_ChoiceList_callOkHandler.call(this);
@@ -353,7 +353,7 @@ Hakubox.HistoryLog = {};
         _Game_Battler_useItem.call(this, item);
         if (Config.templates['item_use'] && (DataManager.isItem(item) || DataManager.isSkill(item))) {
             const userName = this.name ? this.name() : (this.isActor() ? this.actor().name() : this.enemy().name());
-            $gameSystem.addHistoryLog('item_use', { arg1: item.name, arg2: userName });
+            $gameSystem.addHistoryLog('item_use', { arg1: TranslateUtils.getText(item.name), arg2: TranslateUtils.getText(userName) });
         }
     };
 
@@ -674,42 +674,88 @@ Hakubox.HistoryLog = {};
         drawTextExWrap(text, x, y, width) {
             const textState = this.createTextState(text, x, y, width);
             
-            // 手动循环处理每一个字符
-            while (textState.index < textState.text.length) {
-                this.processCharacterWrap(textState);
+            // 新增逻辑：如果是英文环境，启用单词换行模式
+            const isEnglish = (typeof TranslateUtils !== 'undefined' && TranslateUtils.currentLanguage == "en-US");
+            if (isEnglish) {
+                this.processEnglishWrap(textState);
+            } else {
+                // 原有逻辑（逐字换行，适用于中文等）
+                while (textState.index < textState.text.length) {
+                    this.processCharacterWrap(textState);
+                }
             }
             
             return textState.outputWidth;
         }
-
+        // 新增：专门处理英文单词换行的逻辑
+        processEnglishWrap(textState) {
+            while (textState.index < textState.text.length) {
+                const char = textState.text[textState.index];
+                // 1. 如果是控制字符，直接处理 (如 \c[n], \n)
+                if (char.charCodeAt(0) < 0x20) {
+                    this.flushTextState(textState);
+                    this.processControlCharacter(textState, textState.text[textState.index++]);
+                    continue;
+                }
+                // 2. 识别单词：定位下一个空格或结束位置
+                // 如果当前是空格，直接按普通字符处理
+                if (char === ' ') {
+                    this.processCharacterWrap(textState);
+                    continue;
+                }
+                // 3. 预判整个单词的宽度
+                let word = "";
+                let i = textState.index;
+                let wordWidth = 0;
+                while (i < textState.text.length) {
+                    const nextChar = textState.text[i];
+                    // 遇到空格、控制字符或换行符，视为单词结束
+                    if (nextChar === ' ' || nextChar.charCodeAt(0) < 0x20) break;
+                    
+                    word += nextChar;
+                    const w = this.textWidth(nextChar);
+                    wordWidth += w;
+                    i++;
+                }
+                // 4. 判断是否需要换行
+                // 如果 (当前位置 + 单词总宽 > 边界) 且 (不是行首)，则强制换行
+                if (textState.x + wordWidth > textState.startX + textState.width && textState.x > textState.startX) {
+                    textState.x = textState.startX;
+                    textState.y += textState.height;
+                }
+                // 5. 逐个绘制单词中的字符（因为processControlCharacter等内部状态依赖逐字步进）
+                // 这里我们知道单词肯定能放下了（或者刚换完行），所以直接调用普通绘制即可
+                // word.length 次循环
+                const endIndex = textState.index + word.length;
+                while (textState.index < endIndex) {
+                     // 调用原有的绘制逻辑，但因为已经预判过换行，processCharacterWrap 内部的换行判断通常不会触发，
+                     // 除非单词本身长度就超过了整行宽度（那种情况只能强行拆分）
+                     this.processCharacterWrap(textState);
+                }
+            }
+        }
         processCharacterWrap(textState) {
+            // 注意：这里需要稍微修改一下原有的 processCharacterWrap 
+            // 使得它在被 processEnglishWrap 调用时，不会重复进行多余的换行逻辑干扰
+            // 但为了保持兼容性，我们保留原有逻辑，仅依靠 textState.x 的预先调整来控制
             const c = textState.text[textState.index++];
             
-            // 1. 如果是控制字符 (如 \c[n], \i[n], \{, \})
             if (c.charCodeAt(0) < 0x20) {
                 this.flushTextState(textState);
                 this.processControlCharacter(textState, c);
                 return;
             }
-            // 2. 如果是换行符 (手动写的 \n)
-            // 注意：MZ的createTextState会自动把 \\n 转义，这里通常指实际的换行
-            // createTextState 里已经处理了一部分转义，这里主要处理普通文本
             
-            // 3. 计算当前字符宽度
             const w = this.textWidth(c);
-            // 4. 自动换行判断
-            // 如果 (当前X + 字符宽 > 起始X + 最大宽) 并且 (当前不是在行首)
+            
+            // 自动换行判断
+            // 英文模式下，外部已经处理过 textState.x 的重置，这里主要是兜底（比如超长单词）
             if (textState.x + w > textState.startX + textState.width && textState.x > textState.startX) {
-                // 执行换行：X归位，Y增加
                 textState.x = textState.startX;
                 textState.y += textState.height;
-                // 注意：这里不需要 textState.index--，因为我们还没画这个字符，直接在新的一行画即可
             }
-            // 5. 绘制字符
-            // MZ 的标准绘制是先 buffer 再 flush，这里为了简单直接绘制
-            this.contents.drawText(c, textState.x, textState.y, w * 2, textState.height);
             
-            // 6. 移动光标
+            this.contents.drawText(c, textState.x, textState.y, w * 2, textState.height);
             textState.x += w;
         }
 
@@ -789,7 +835,7 @@ Hakubox.HistoryLog = {};
                 
                 if (Config.templates.dialogue.color.startsWith("#")) this.changeTextColor(Config.templates.dialogue.color);
                 else this.changeTextColor(ColorManager.textColor(Number(Config.templates.dialogue.color)));
-                this.drawTextExWrap(c.text, textX + Config.padding, curY, textW);
+                this.drawTextExWrap(TranslateUtils.getText(c.text), textX + Config.padding, curY, textW);
                 
                 return; // *** 关键：处理完对话直接返回，不走下面的通用逻辑 ***
             }
@@ -808,13 +854,13 @@ Hakubox.HistoryLog = {};
                 }
                 
                 // 处理文本格式：将 $1, $2 替换为参数
-                let textToShow = template.format || "";
+                let textToShow = TranslateUtils.getText(template.format || "");
                 const c = record.content || {}; // 这里的 content 可能是 {arg1: "...", arg2: "..."}
 
                 // 安全替换 $1-$9
                 textToShow = textToShow.replace(/\$(\d+)/g, (match, number) => {
                     const key = 'arg' + number;
-                    return (c[key] !== undefined && c[key] !== null) ? c[key] : "";
+                    return TranslateUtils.getText(c[key] || "");
                 });
                 
                 // 计算垂直居中 Y

@@ -193,6 +193,7 @@
         
         this._commandWindow.setHandler('formation', this.commandFormation.bind(this));
         this._commandWindow.setHandler('options', this.commandOptions.bind(this));
+        this._commandWindow.setHandler('continue',this.commandContinue.bind(this));
         this._commandWindow.setHandler('save',    this.commandSave.bind(this));
         this._commandWindow.setHandler('gameEnd', this.commandGameEnd.bind(this));
         this._commandWindow.setHandler('cancel',  this.popScene.bind(this));
@@ -207,6 +208,27 @@
         });
 
         this.addWindow(this._commandWindow);
+    };
+
+    
+    const _Window_MenuCommand_addSaveCommand = Window_MenuCommand.prototype.addSaveCommand;
+    Window_MenuCommand.prototype.addSaveCommand = function () {
+        const enabled = this.isContinueEnabled();
+        this.addCommand("读取", "continue", enabled);
+
+        // 先调用原本的添加“保存”命令
+        _Window_MenuCommand_addSaveCommand.call(this);
+    };
+    // 定义点击“读取”后的行为
+    Scene_Menu.prototype.commandContinue = function () {
+        // 关闭菜单窗口
+        this._commandWindow.close();
+        // 跳转到自带的读取画面 (Scene_Load)
+        SceneManager.push(Scene_Load);
+    };
+    // 辅助函数：判断是否允许读取（有没有存档）
+    Window_MenuCommand.prototype.isContinueEnabled = function () {
+        return DataManager.isAnySavefileExists();
     };
 
     // 4. 处理自定义命令的具体逻辑

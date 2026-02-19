@@ -139,25 +139,57 @@
 
   // #region 调整对话框换行策略
 
-  Window_Message.prototype.flushTextState = function(textState, char) {
+  Window_Message.prototype.flushTextState = function (textState, char) {
     const text = textState.buffer;
     const rtl = textState.rtl;
     const height = textState.height;
     const x = rtl ? textState.x - width : textState.x;
     const y = textState.y;
-
     if (char) {
       const width = this.textWidth(char);
       if (textState.drawing) {
         this.contents.drawText(char, x, y, width, height);
       }
       textState.x += rtl ? -width : width;
+
+      // --- 修改开始：增加英文单词换行判断 ---
+      const isEnglish = (typeof TranslateUtils !== 'undefined' && TranslateUtils.currentLanguage == "en-US");
+
+      // 判断是否超出了文本框宽度
       if ((textState.x + width + this.padding * 2 >= textState.startX + textState.width) && textState.width && !(this instanceof Window_NameBox)) {
+
+        // 如果是英文，且不是在处理空格，尝试进行单词换行处理
+        if (isEnglish && char !== " ") {
+          // 1. 获取当前缓冲区剩余未处理的文本
+          const remainingText = textState.text.slice(textState.index);
+          // 2. 找到下一个空格或结束符，确定当前单词的剩余长度
+          const nextSpaceIndex = remainingText.search(/[\s\n]/);
+          const wordEndIndex = nextSpaceIndex === -1 ? remainingText.length : nextSpaceIndex;
+          const currentWordRemainder = remainingText.slice(0, wordEndIndex);
+
+          // 3. 简单的策略：如果碰到边界，通常 RM 会把当前这个字符挤到下一行。
+          // 对于英文，我们希望把这个单词前面的部分（已经画在行末的）擦除不太现实，
+          // 所以 RM 的逐字处理机制比较难完美实现 WordWrap。
+          // 但根据你的需求，这里插入一个简易逻辑：
+          // 如果当前字符导致换行，且它属于一个单词的一部分，强行换行。
+          // 为了防止单词被切断，标准做法其实是在 processCharacter 里预判整个单词宽度。
+          // 但鉴于只修改 flushTextState，我们只能控制“换行时机”。
+
+          // 标准 RM 逻辑就是下面这几行，它会单纯把 x 重置。
+          // 这会导致单词前半截在上一行，后半截在下一行。
+          // 由于 flushTextState 是逐字调用的，要完美回溯比较复杂。
+          // 这里我们采用一种“预判换行”的变通策略：
+
+          // 实际上，要在 flushTextState 也就是绘制后处理换行很难“不切断”单词。
+          // 对于 RPG Maker MZ，更推荐在 processCharacter 阶段做判断。
+          // 但既然你要求修改这里，我们保持原有逻辑基本不变，只是单纯执行换行。
+          // 如果想要完美的 Word Wrap，必须重写 processNormalCharacter。
+        }
         textState.x = textState.startX;
         textState.y += this.calcTextHeight(textState);
       }
+      // --- 修改结束 ---
       textState.buffer = this.createTextBuffer(rtl);
-      
       if (this instanceof Window_NameBox) {
         const _width = this.textWidth(textState.text);
         if (textState.width < _width) {
@@ -178,16 +210,59 @@
       textState.outputHeight = y - textState.startY + height;
     }
   };
-  Window_Message.prototype.processCharacter = function(textState) {
-    const c = textState.text[textState.index++];
-    if (c.charCodeAt(0) < 0x20) {
+  // 重写 processCharacter 以支持英文整词预判换行
+  const _Window_Message_processCharacter = Window_Message.prototype.processCharacter;
+  Window_Message.prototype.processCharacter = function (textState) {
+    const c = textState.text[textState.index]; // 注意这里先不 ++，先读取
+
+    // --- 新增逻辑：英文单词整词换行预判 ---
+    const isEnglish = (typeof TranslateUtils !== 'undefined' && TranslateUtils.currentLanguage == "en-US");
+
+    // 只有在普通字符（非控制字符，非换行），且是英文环境下才进行判断
+    if (isEnglish && c && c.charCodeAt(0) >= 0x20 && !(this instanceof Window_NameBox)) {
+      // 这是一个简单的单词边界检查，寻找下一个空格
+      if (c !== " ") { // 如果当前字符不是空格，说明在一个单词中间或开头
+        // 往前看，确认当前是不是单词的开头（或者前一个是空格）
+        const prevChar = textState.index > 0 ? textState.text[textState.index - 1] : " ";
+        // 如果是单词的开头，我们需要在这个时刻计算整个单词的长度
+        if (prevChar === " " || prevChar === "\n" || textState.index === 0) {
+          let word = "";
+          let i = textState.index;
+          // 获取完整单词
+          while (i < textState.text.length) {
+            const char = textState.text[i];
+            // 遇到空格、换行、或转义字符开始符，停止
+            if (char === " " || char === "\n" || char === "\x1b") break;
+            word += char;
+            i++;
+          }
+
+          if (word.length > 0) {
+            const wordWidth = this.textWidth(word);
+            // 如果 当前位置 + 整个单词宽度 > 允许的宽度
+            if (textState.x + wordWidth + this.padding * 2 > textState.startX + textState.width) {
+              // 且这不是一行的开头（避免死循环，如果单词本身就比一行长，还是得切断）
+              if (textState.x > textState.startX) {
+                // 强制执行换行
+                textState.x = textState.startX;
+                textState.y += this.calcTextHeight(textState);
+              }
+            }
+          }
+        }
+      }
+    }
+    // --- 新增逻辑结束 ---
+    // 原有逻辑
+    const char = textState.text[textState.index++];
+    if (char.charCodeAt(0) < 0x20) {
       this.flushTextState(textState);
-      this.processControlCharacter(textState, c);
+      this.processControlCharacter(textState, char);
     } else {
-      this.flushTextState(textState, c);
+      this.flushTextState(textState, char);
     }
   };
-  Window_Message.prototype.createTextState = function(text, x, y, width) {
+  Window_Message.prototype.createTextState = function (text, x, y, width) {
     if (!width) width = this.width;
     const rtl = Utils.containsArabic(text);
     const textState = {};
@@ -206,7 +281,7 @@
     textState.outputHeight = 0;
     return textState;
   };
-  Window_Message.prototype.drawTextEx = function(text, x, y, width, config) {
+  Window_Message.prototype.drawTextEx = function (text, x, y, width, config) {
     this.resetFontSettings(config);
     const textState = this.createTextState(text, x, y, width);
     this.processAllText(textState);
@@ -214,63 +289,63 @@
   };
 
   // #region Sprite增加文本输出
-  Sprite.prototype.lineHeight = function() {
+  Sprite.prototype.lineHeight = function () {
     return 36;
   };
-  Sprite.prototype.resetTextColor = function() {
+  Sprite.prototype.resetTextColor = function () {
     this.bitmap.textColor = ColorManager.normalColor();
     this.bitmap.outlineColor = ColorManager.outlineColor();
   };
-  Sprite.prototype.maxFontSizeInLine = function(line) {
+  Sprite.prototype.maxFontSizeInLine = function (line) {
     let maxFontSize = this.bitmap.fontSize;
     const regExp = /\x1b({|}|FS)(\[(\d+)])?/gi;
-    for (;;) {
-        const array = regExp.exec(line);
-        if (!array) {
-            break;
-        }
-        const code = String(array[1]).toUpperCase();
-        if (code === "{") {
-            this.makeFontBigger();
-        } else if (code === "}") {
-            this.makeFontSmaller();
-        } else if (code === "FS") {
-            this.bitmap.fontSize = parseInt(array[3]);
-        }
-        if (this.bitmap.fontSize > maxFontSize) {
-            maxFontSize = this.bitmap.fontSize;
-        }
+    for (; ;) {
+      const array = regExp.exec(line);
+      if (!array) {
+        break;
+      }
+      const code = String(array[1]).toUpperCase();
+      if (code === "{") {
+        this.makeFontBigger();
+      } else if (code === "}") {
+        this.makeFontSmaller();
+      } else if (code === "FS") {
+        this.bitmap.fontSize = parseInt(array[3]);
+      }
+      if (this.bitmap.fontSize > maxFontSize) {
+        maxFontSize = this.bitmap.fontSize;
+      }
     }
     return maxFontSize;
   };
-  Sprite.prototype.createTextBuffer = function(rtl) {
+  Sprite.prototype.createTextBuffer = function (rtl) {
     // U+202B: RIGHT-TO-LEFT EMBEDDING
     return rtl ? "\u202B" : "";
   };
-  Sprite.prototype.resetFontSettings = function() {
+  Sprite.prototype.resetFontSettings = function () {
     this.bitmap.fontFace = $gameSystem.mainFontFace();
     this.bitmap.fontSize = $gameSystem.mainFontSize();
     this.resetTextColor();
   };
-  Sprite.prototype.textWidth = function(text) {
+  Sprite.prototype.textWidth = function (text) {
     return this.bitmap.measureTextWidth(text);
   };
-  Sprite.prototype.obtainEscapeCode = function(textState) {
+  Sprite.prototype.obtainEscapeCode = function (textState) {
     const regExp = /^[$.|^!><{}\\]|^[A-Z]+/i;
     const arr = regExp.exec(textState.text.slice(textState.index));
     if (arr) {
-        textState.index += arr[0].length;
-        return arr[0].toUpperCase();
+      textState.index += arr[0].length;
+      return arr[0].toUpperCase();
     } else {
-        return "";
+      return "";
     }
   };
-  Sprite.prototype.processNewLine = function(textState) {
+  Sprite.prototype.processNewLine = function (textState) {
     textState.x = textState.startX;
     textState.y += textState.height;
     textState.height = this.calcTextHeight(textState);
   };
-  Sprite.prototype.calcTextHeight = function(textState) {
+  Sprite.prototype.calcTextHeight = function (textState) {
     const lineSpacing = this.lineHeight() - $gameSystem.mainFontSize();
     const lastFontSize = this.bitmap.fontSize;
     const lines = textState.text.slice(textState.index).split("\n");
@@ -278,18 +353,18 @@
     this.bitmap.fontSize = lastFontSize;
     return textHeight;
   };
-  Sprite.prototype.makeFontBigger = function() {
+  Sprite.prototype.makeFontBigger = function () {
     if (this.bitmap.fontSize <= 96) {
       this.bitmap.fontSize += 12;
     }
   };
 
-  Sprite.prototype.makeFontSmaller = function() {
+  Sprite.prototype.makeFontSmaller = function () {
     if (this.bitmap.fontSize >= 24) {
       this.bitmap.fontSize -= 12;
     }
   };
-  Sprite.prototype.processEscapeCharacter = function(code, textState) {
+  Sprite.prototype.processEscapeCharacter = function (code, textState) {
     switch (code) {
       case "C":
         this.processColorChange(this.obtainEscapeParam(textState));
@@ -314,7 +389,7 @@
         break;
     }
   };
-  Sprite.prototype.processControlCharacter = function(textState, c) {
+  Sprite.prototype.processControlCharacter = function (textState, c) {
     if (c === "\n") {
       this.processNewLine(textState);
     }
@@ -323,11 +398,11 @@
       this.processEscapeCharacter(code, textState);
     }
   };
-  Sprite.prototype.actorName = function(n) {
+  Sprite.prototype.actorName = function (n) {
     const actor = n >= 1 ? $gameActors.actor(n) : null;
     return actor ? actor.name() : "";
   };
-  Sprite.prototype.convertEscapeCharacters = function(text) {
+  Sprite.prototype.convertEscapeCharacters = function (text) {
     /* eslint no-control-regex: 0 */
     text = text.replace(/\\/g, "\x1b");
     text = text.replace(/\x1b\x1b/g, "\\");
@@ -345,7 +420,7 @@
     text = text.replace(/\x1bG/gi, TextManager.currencyUnit);
     return text;
   };
-  Sprite.prototype.createTextState = function(text, x, y, width) {
+  Sprite.prototype.createTextState = function (text, x, y, width) {
     const rtl = Utils.containsArabic(text);
     const textState = {};
     textState.text = this.convertEscapeCharacters(text);
@@ -363,7 +438,7 @@
     textState.outputHeight = 0;
     return textState;
   };
-  Sprite.prototype.flushTextState = function(textState, char) {
+  Sprite.prototype.flushTextState = function (textState, char) {
     const text = textState.buffer;
     const rtl = textState.rtl;
     const height = textState.height;
@@ -395,7 +470,7 @@
       textState.outputHeight = y - textState.startY + height;
     }
   };
-  Sprite.prototype.processCharacter = function(textState) {
+  Sprite.prototype.processCharacter = function (textState) {
     const c = textState.text[textState.index++];
     if (c.charCodeAt(0) < 0x20) {
       this.flushTextState(textState);
@@ -404,14 +479,14 @@
       this.flushTextState(textState, c);
     }
   };
-  Sprite.prototype.processAllText = function(textState) {
+  Sprite.prototype.processAllText = function (textState) {
     while (textState.index < textState.text.length) {
       this.processCharacter(textState);
     }
     this.flushTextState(textState);
     return textState.outputWidth;
   };
-  
+
   /**
    * 输入换行的文本
    * @param {string} text 文本内容
@@ -419,7 +494,7 @@
    * @param {number} y Y坐标
    * @param {number} width 宽度
    */
-  Sprite.prototype.drawTextEx = function(text, x, y, width) {
+  Sprite.prototype.drawTextEx = function (text, x, y, width) {
     // this.resetFontSettings();
     const textState = this.createTextState(text, x, y, width);
     this.processAllText(textState);
@@ -430,18 +505,18 @@
 
 
   // #region 保存额外的信息
-  
+
   DataManager._extraInfo = undefined;
 
-  DataManager.loadExtraInfo = function() {
+  DataManager.loadExtraInfo = function () {
     return new Promise(resolve => {
       // TranslateUtils.loadLocalTranslateFile(() => {
-        resolve();
+      resolve();
       // });
     });
   };
 
-  DataManager.loadLanguageInfo = function() {
+  DataManager.loadLanguageInfo = function () {
     StorageManager.loadObject("extra").then(extraInfo => {
       this._extraInfo = extraInfo || DataManager.makeExtraInfo();
       return 0;
@@ -450,21 +525,21 @@
     });
   };
 
-  DataManager.isLanguageInfoLoaded = function() {
+  DataManager.isLanguageInfoLoaded = function () {
     return true;
     // return Object.keys(TranslateUtils.keys || {}).length > 1;
   };
-  
 
-  DataManager.saveExtraInfo = function() {
+
+  DataManager.saveExtraInfo = function () {
     StorageManager.saveObject("extra", this._extraInfo);
   };
 
-  DataManager.isExtraInfoLoaded = function() {
+  DataManager.isExtraInfoLoaded = function () {
     return !!this._extraInfo;
   };
 
-  DataManager.makeExtraInfo = function() {
+  DataManager.makeExtraInfo = function () {
     const info = {};
     info.clearSceneList = [];
     info.clearCourseList = [];
@@ -474,15 +549,15 @@
   };
 
   // 解锁全部场景
-  DataManager.isClearAllScene = function() {
+  DataManager.isClearAllScene = function () {
     return this._extraInfo.isClearAll === true;
   };
-  DataManager.clearAllScene = function() {
+  DataManager.clearAllScene = function () {
     this._extraInfo.isClearAll = true;
     DataManager.saveExtraInfo();
   };
   // 解锁某个场景
-  DataManager.clearScene = function(sceneId) {
+  DataManager.clearScene = function (sceneId) {
     if (!this._extraInfo.clearSceneList) this._extraInfo.clearSceneList = [];
     if (!this._extraInfo.clearSceneList.includes(sceneId)) {
       this._extraInfo.clearSceneList.push(sceneId);
@@ -490,16 +565,16 @@
     DataManager.saveExtraInfo();
   };
   // 判断某个场景是否解锁
-  DataManager.isClearScene = function(sceneId) {
+  DataManager.isClearScene = function (sceneId) {
     return this._extraInfo.isClearAll || this._extraInfo.clearSceneList.includes(sceneId);
   };
   // 判断是否通过教程
-  DataManager.isClearCourse = function(courseId) {
+  DataManager.isClearCourse = function (courseId) {
     if (!this._extraInfo.clearCourseList) this._extraInfo.clearCourseList = [];
     return this._extraInfo.clearCourseList.includes(courseId);
   };
   // 解锁某个教程
-  DataManager.clearCourse = function(courseId) {
+  DataManager.clearCourse = function (courseId) {
     if (!this._extraInfo.clearCourseList) this._extraInfo.clearCourseList = [];
     if (!this._extraInfo.clearCourseList.includes(courseId)) {
       this._extraInfo.clearCourseList.push(courseId);
@@ -507,7 +582,7 @@
     DataManager.saveExtraInfo();
   };
   // 删除某个教程（反向解锁）
-  DataManager.removeCourse = function(courseId) {
+  DataManager.removeCourse = function (courseId) {
     if (!this._extraInfo.clearCourseList) this._extraInfo.clearCourseList = [];
     const _index = this._extraInfo.clearCourseList.indexOf(courseId);
     if (_index >= 0) {
@@ -516,11 +591,11 @@
     DataManager.saveExtraInfo();
   };
 
-  Scene_Boot.prototype.updateDocumentTitle = function() {
+  Scene_Boot.prototype.updateDocumentTitle = function () {
     document.title = TranslateUtils.getText($dataSystem.gameTitle) + ' v' + params.versionNo;
   };
 
-  DataManager.onXhrLoad = function(xhr, name, src, url) {
+  DataManager.onXhrLoad = function (xhr, name, src, url) {
     if (xhr.status < 400) {
       window[name] = JSON.parse(xhr.responseText);
       this.onLoad(window[name]);
@@ -532,14 +607,14 @@
     }
   };
 
-  Scene_Boot.prototype.loadPlayerData = function() {
+  Scene_Boot.prototype.loadPlayerData = function () {
     DataManager.loadLanguageInfo();
     DataManager.loadGlobalInfo();
     DataManager.loadExtraInfo();
     ConfigManager.load();
   };
 
-  Scene_Boot.prototype.isPlayerDataLoaded = function() {
+  Scene_Boot.prototype.isPlayerDataLoaded = function () {
     return DataManager.isGlobalInfoLoaded() && DataManager.isLanguageInfoLoaded() && DataManager.isExtraInfoLoaded() && ConfigManager.isLoaded();
   };
 
@@ -548,14 +623,14 @@
 
   // #region 修改姓名框宽度
 
-  Window_NameBox.prototype.updatePadding = function() {
+  Window_NameBox.prototype.updatePadding = function () {
     this.padding = 12;
   };
-  Window_NameBox.prototype.lineHeight = function() {
+  Window_NameBox.prototype.lineHeight = function () {
     return 50;
   };
 
-  Window_NameBox.prototype.windowWidth = function() {
+  Window_NameBox.prototype.windowWidth = function () {
     if (this._name) {
       const textWidth = this.textSizeEx(this._name).width;
       const padding = this.padding + this.itemPadding();
@@ -566,7 +641,7 @@
     }
   };
 
-  Window_NameBox.prototype.baseTextRect = function() {
+  Window_NameBox.prototype.baseTextRect = function () {
     const rect = new Rectangle(0, 0, this.innerWidth, this.innerHeight);
     rect.pad(-this.itemPadding() - this.padding - this.itemPadding(), 0);
     return rect;
@@ -574,7 +649,7 @@
 
   // #endregion
 
-  
+
   // #region 存储数据相关
 
   window.__TEMP_GAME_DATA = {
@@ -583,7 +658,7 @@
 
   // 创建版本号标签
   const _Scene_Title_create = Scene_Title.prototype.create;
-  Scene_Title.prototype.create = function() {
+  Scene_Title.prototype.create = function () {
     _Scene_Title_create.call(this);
     this.createVersion();
 
@@ -591,8 +666,8 @@
     window.gameTitle = $dataSystem.gameTitle;
     window.title = `${window.gameTitle} v${$dataSystem.gameVersion}`;
   };
-  
-  Scene_Title.prototype.createVersion = function() {
+
+  Scene_Title.prototype.createVersion = function () {
     const _bitmap = new Bitmap(200, 50);
     this._gameVersionSprite = new Sprite(_bitmap);
     this._gameVersionSprite.y = params.versionLabelY;
@@ -610,10 +685,10 @@
 
   // 修改保存的数据文件，在里面添加版本号
   const _DataManager_makeSavefileInfo = DataManager.makeSavefileInfo;
-  DataManager.makeSavefileInfo = function() {
+  DataManager.makeSavefileInfo = function () {
 
     const _info = _DataManager_makeSavefileInfo.call(this);
-    
+
     // 游戏版本
     _info.gameVersion = params.versionNo || '';
     _info.version = 'v' + _info.version;
@@ -669,17 +744,17 @@
     },
   };
   window.moduleTicker = moduleTicker;
-  
-  Scene_Base.prototype.isFastForward = function() {
+
+  Scene_Base.prototype.isFastForward = function () {
     return (
       $gameMap.isEventRunning() &&
       !SceneManager.isSceneChanging() &&
       (Input.isLongPressed("ok") || TouchInput.isLongPressed() || $gameData.isSkip)
     );
   }
-  
+
   const Scene_Base_update = Scene_Base.prototype.update;
-  Scene_Base.prototype.update = function() {
+  Scene_Base.prototype.update = function () {
     Scene_Base_update.call(this);
     // 调用模块更新
     window.moduleTicker.update();
@@ -695,7 +770,7 @@
    * @param {(progress: number) => void} update 更新函数
    * @param {{ easingType: string, inout: string }} info 动画信息
    */
-  window.useTimeout = function(callback, delay, update, info = { easingType: 'Linear', inout: 'None' }) {
+  window.useTimeout = function (callback, delay, update, info = { easingType: 'Linear', inout: 'None' }) {
     const _timer = {
       frameIndex: 0,
       frameCount: delay,
@@ -727,7 +802,7 @@
   // #endregion
 
 
-  Scene_Map.prototype.createWindowLayer = function() {
+  Scene_Map.prototype.createWindowLayer = function () {
     this._windowLayer = new WindowLayer();
     this._windowLayer.x = 0;
     this._windowLayer.y = (Graphics.height - Graphics.boxHeight) / 2;
@@ -751,14 +826,34 @@
   //     goldWindow.y = this.y > 0 ? 0 : Graphics.boxHeight - goldWindow.height;
   //   }
   // };
-  
+
+  /** 修改存档读档界面标题 */
+  Window_SavefileList.prototype.drawTitle = function (savefileId, x, y) {
+    if (savefileId === 0) {
+      this.drawText(TextManager.autosave, x, y, 180);
+    } else {
+      this.drawText(TranslateUtils.getText(TextManager.file) + " " + savefileId, x, y, 180);
+    }
+  };
+
+  const _Scene_Options_optionsWindowRect = Scene_Options.prototype.optionsWindowRect;
+  Scene_Options.prototype.optionsWindowRect = function () {
+    const rect = _Scene_Options_optionsWindowRect.call(this);
+
+    const desiredLines = 8;
+    rect.height = this.calcWindowHeight(desiredLines, true);
+    rect.y = (Graphics.boxHeight - rect.height) / 2;
+    return rect;
+  };
+
+
   if (Utils.RPGMAKER_NAME === "MZ") {
-    PluginManager.registerCommand(PluginName, 'clearScene', function(args) {
+    PluginManager.registerCommand(PluginName, 'clearScene', function (args) {
       if (!DataManager.isClearScene(args.sceneId)) {
         DataManager.clearScene(args.sceneId);
       }
     });
-    PluginManager.registerCommand(PluginName, 'clearAllScene', function(args) {
+    PluginManager.registerCommand(PluginName, 'clearAllScene', function (args) {
       DataManager.clearAllScene();
     });
   }

@@ -85,25 +85,83 @@
  * ============================================================================
  * 【四、脚本指令手册 (Script Calls)】
  * ============================================================================
- * 在“条件分歧 ➔ 脚本”中使用，用于判断任务流程。
- * 假设你的任务ID是 quest_01。
+ * 在“条件分歧 ➔ 脚本”中使用，用于控制复杂的任务逻辑。
+ * 所有的函数都位于全局对象 SimpleQuest 下。
  *
- * 1. 判断任务是否正在进行
- *    SimpleQuest.isActive("quest_01")
- *    ➔ 返回 true (任务在列表中) / false (未接或已归档)
+ * ----------------------------------------------------------------------------
+ * 1. 状态判断 (支持多任务 & 列表判断)
+ * ----------------------------------------------------------------------------
+ * 这些函数用于检查任务当前的实时状态。
+ * ★特点：只检测【未归档(未完成)】的任务。如果任务已完成，均返回 false。
  *
- * 2. 判断是否已达标 (可以交任务了)
- *    const q = $gameSystem.getLatestInstance("quest_01");
- *    q && q.status === 1
- *    *(注：status 0=进行中, 1=已达标, 2=失败, 3=已归档)*
+ * 【通用参数说明】
+ *   excludeHidden (Boolean): 
+ *     true  ➔ 仅检查可见任务。如果任务接了但因为 condition 被隐藏，视为不符合。
+ *     false ➔ 检查所有任务 (推荐默认用这个)。
+ *   ...ids (String/Array): 
+ *     可以传入一个ID字符串，也可以传入多个ID，或者直接传入ID数组。
  *
- * 3. 判断是否曾经接取过 (无论现在是否已完成)
- *    SimpleQuest.hasHistory("quest_01")
- *    ➔ 常用于“一次性任务”判断，如果不希望玩家重复接取。
+ * 
+ * A. 判断【进行中】(Active) - 任务已接取，且未达标，未失败，未归档。
+ *    // 单个判断
+ *    SimpleQuest.everyActive(false, "kill_slime")
+ *    
+ *    // [全满足] 必须任务A和任务B都在进行中，才返回 true
+ *    SimpleQuest.everyActive(false, "quest_A", "quest_B")
+ *    
+ *    // [任一满足] 只要任务A或任务B有一个在进行中，就返回 true
+ *    SimpleQuest.someActive(false, "quest_A", "quest_B")
  *
- * 4. 获取任务完成/领取过几次
- *    SimpleQuest.countHistory("quest_01")
- *    ➔ 返回数字。
+ * 
+ * B. 判断【已达标待提交】(Success) - 进度已满，尚未提交归档。
+ *    // 典型场景：玩家找NPC交任务，判断是否满足提交条件
+ *    SimpleQuest.everySuccess(false, "kill_slime")
+ *
+ * 
+ * C. 判断【已失败】(Fail) - 任务失败且未归档。
+ *    SimpleQuest.everyFail(false, "protect_npc")
+ *
+ *
+ * ----------------------------------------------------------------------------
+ * 2. 历史与数据查询 (包含已归档任务)
+ * ----------------------------------------------------------------------------
+ * 这些函数会查询所有数据，包括【已完成/已归档】的任务。
+ *
+ * A. 判断是否曾经接取过
+ *    // 无论现在是进行中、失败还是已完成，只要接取过就返回 true
+ *    // 场景：用于判断“是否认识某人”或“是否触发过某剧情”
+ *    SimpleQuest.hasHistory("meet_princess")
+ *
+ * B. 获取累计接取次数
+ *    // 返回数字。如果没接过返回 0。
+ *    SimpleQuest.countHistory("daily_quest_01")
+ *
+ * C. 判断【特定任务外的全清】(高级反向查询)
+ *    // 场景：除了主线(main_quest)以外，其他的(支线/隐藏)任务全都做完归档了吗？
+ *    // 返回 true 表示全都做完了(除了 main_quest)。
+ *    SimpleQuest.isAllCompletedExcept(["main_quest"])
+ *
+ *    // 场景：判断是否所有接过的任务都已彻底完成/归档？(不排除任何任务)
+ *    SimpleQuest.isAllCompletedExcept()
+ *
+ * ----------------------------------------------------------------------------
+ * 3. 进度与描述操作 (高级用法)
+ * ----------------------------------------------------------------------------
+ * 虽然通常推荐用插件指令，但脚本也可以直接操作。
+ *
+ * A. 强制完成/归档任务
+ *    // 参数: (任务ID, 是否归档, 强制执行?)
+ *    // 将任务彻底移出列表，标记为完成。
+ *    SimpleQuest.setLatestCompleted("kill_slime", true)
+ *
+ * B. 修改任务进度
+ *    // 直接设为 5
+ *    SimpleQuest.setLatestProgress("kill_slime", 5)
+ *    // 增加 1
+ *    SimpleQuest.addLatestProgress("kill_slime", 1)
+ *
+ * C. 动态修改描述
+ *    SimpleQuest.updateLatestDesc("kill_slime", "史莱姆王出现了！快击败它！")
  *
  * ============================================================================
  * 【五、高级功能：自动监控代码 (Automated Quests)】
@@ -406,8 +464,20 @@
  * @value success
  * @option 失败
  * @value fail
- * @option 完成(归档消失)
- * @value complete
+ * @option 进行中
+ * @value active
+ * 
+ * @command SetCompleted
+ * @text ➔ 设置归档状态
+ * @desc 将任务标记为“已归档/已完成”，使其从任务列表(HUD)中移除，但仍可通过脚本查询。
+ * @arg templateId
+ * @text 任务ID
+ * @type string
+ * @arg completed
+ * @text 是否归档
+ * @type boolean
+ * @default true
+ * @desc true=归档隐藏, false=取消归档(若未达标则重新显示)
  *
  * @command UpdateDesc
  * @text ➔ 更新描述
@@ -642,7 +712,7 @@
         }
     }
 
-    const CONFIG = {
+    let CONFIG = {
         x: Number(PARAMS['hudX'] || 10),
         y: Number(PARAMS['hudY'] || 10),
         width: Number(PARAMS['hudWidth'] || 320),
@@ -651,22 +721,25 @@
         sectionSpacing: Number(PARAMS['sectionSpacing'] || 24),
         
         showBg: PARAMS['showListBackground'] === 'true',
-        bgColor: parseColor(PARAMS['listBackgroundColor'] || 'rgba(0,0,0,0.5)'),
-        headerBgColor: parseColor(PARAMS['headerBackgroundColor'] || 'rgba(0,0,0,0.6)'),
+        bgColor: PARAMS['listBackgroundColor'] || 'rgba(0,0,0,0.5)',
+        headerBgColor: PARAMS['headerBackgroundColor'] || 'rgba(0,0,0,0.6)',
         borderRadius: Number(PARAMS['borderRadius'] || 8),
         
         outlineWidth: Number(PARAMS['fontOutlineWidth'] || 3),
         shadowDist: Number(PARAMS['fontShadowDistance'] || 1),
-        outlineColor: parseColor(PARAMS['fontOutlineColor'] || '#000000'),
+        outlineColor: PARAMS['fontOutlineColor'] || '#000000',
         visibleSwitchId: Number(PARAMS['visibleSwitchId'] || 0),
         hiddenOpacity: Number(PARAMS['hiddenOpacity'] || 50),
 
         fontSizeGroup: Number(PARAMS['fontSizeGroup'] || 16),
         fontSizeTitle: Number(PARAMS['fontSizeTitle'] || 15),
         fontSizeReward: Number(PARAMS['fontSizeReward'] || 14),
-        colorReward: parseColor(PARAMS['fontColorReward'] || 0), // 这里复用parseColor处理颜色
+        colorReward: PARAMS['fontColorReward'] || 0,
         fontSizeDesc: Number(PARAMS['fontSizeDesc'] || 13),
-        fontColorDesc: parseColor(PARAMS['fontColorDesc'] || 'rgba(220, 220, 220, 0.9)'),
+        fontColorDesc: PARAMS['fontColorDesc'] || 'rgba(220, 220, 220, 0.9)',
+
+        enableMapNameOpacity: PARAMS['enableMapNameOpacity'] === 'true',
+        enableMouseOpacity: PARAMS['enableMouseOpacity'] === 'true',
 
         globalSe: {
             accept: PARAMS['seAccept'],
@@ -675,9 +748,9 @@
         },
 
         statusText: {
-            0: { text: PARAMS['textRunning'], color: parseColor(PARAMS['colorRunning']) },
-            1: { text: PARAMS['textSuccess'], color: parseColor(PARAMS['colorSuccess']) },
-            2: { text: PARAMS['textFail'],    color: parseColor(PARAMS['colorFail']) },
+            0: { text: PARAMS['textRunning'], color: PARAMS['colorRunning'] },
+            1: { text: PARAMS['textSuccess'], color: PARAMS['colorSuccess'] },
+            2: { text: PARAMS['textFail'],    color: PARAMS['colorFail'] },
         },
         categories: parseStructList(PARAMS['categoryList']).sort((a, b) => Number(a.priority) - Number(b.priority)),
         templates: {}
@@ -728,8 +801,7 @@
     const Q_STATUS = {
         RUNNING: 0,
         SUCCESS: 1, 
-        FAIL: 2,
-        COMPLETE: 3
+        FAIL: 2
     };
 
     // ======================================================================
@@ -778,6 +850,7 @@
                 title: template.title,
                 desc: template.desc,
                 status: Q_STATUS.RUNNING,
+                isCompleted: false,
                 progress: 0, 
                 maxProgress: template.maxProgress, 
                 timestamp: Date.now()
@@ -798,7 +871,7 @@
 
             instance.status = status;
 
-            if ((status === Q_STATUS.SUCCESS || status === Q_STATUS.COMPLETE) && instance.progress < instance.maxProgress) {
+            if ((status === Q_STATUS.SUCCESS) && instance.progress < instance.maxProgress) {
                 instance.progress = instance.maxProgress;
             }
 
@@ -817,10 +890,6 @@
                 else if (status === Q_STATUS.FAIL) {
                     reserveCommonEvent(template.ceFail);
                     this._evalCode(template.onFail, instance);
-                } 
-                else if (status === Q_STATUS.COMPLETE) {
-                    reserveCommonEvent(template.ceComplete);
-                    this._evalCode(template.onComplete, instance);
                 }
             }
         },
@@ -838,7 +907,7 @@
             const instance = $gameSystem.getLatestInstance(templateId);
             if (!instance) return;
 
-            if (instance.status === Q_STATUS.FAIL || instance.status === Q_STATUS.COMPLETE) return;
+            if (instance.status === Q_STATUS.FAIL) return;
 
             let newVal = value;
             if (newVal < 0) newVal = 0;
@@ -850,6 +919,29 @@
                 this.setStatusByUuid(instance.uuid, Q_STATUS.SUCCESS);
             } else {
                 $gameSystem.requestHudRefresh(); 
+            }
+        },
+
+        // 新增：安全归档逻辑
+        // 只有当任务处于 Success 或 Fail 时，或者 force=true 时，才允许归档
+        setLatestCompleted(templateId, isCompleted, force = false) {
+            const instance = $gameSystem.getLatestInstance(templateId);
+            if (!instance) return;
+            // 安全检查：如果任务还在 Running 且非强制，不允许直接归档，防止任务逻辑断层
+            if (instance.status === 0 && isCompleted && !force) {
+                console.warn(`SimpleQuest: 试图归档一个正在进行中的任务 ${templateId}，操作已被拦截。建议先 SetStatus 为 Success/Fail，或在指令中勾选‘强制’。`);
+                return;
+            }
+            instance.isCompleted = !!isCompleted;
+            $gameSystem.requestHudRefresh();
+            
+            // 归档时触发完成事件
+            if (isCompleted) {
+                const template = CONFIG.templates[instance.templateId];
+                if (template) {
+                    reserveCommonEvent(template.ceComplete);
+                    this._evalCode(template.onComplete, instance);
+                }
             }
         },
 
@@ -882,43 +974,174 @@
         // --- 查询 API (Utility Functions) ---
 
         /**
-         * 判断任务是否处在“进行中”状态 (进行中 或 成功待提交)
-         * @param {string} templateId 
-         * @returns {boolean}
+         * 统一检查状态
+         * @param {string|Array} ids - 任务ID
+         * @param {Function} checkFn - 针对单个实例的检查回调 (返回true/false)
+         * @param {boolean} excludeHidden - 是否排除被条件隐藏的任务
          */
-        isActive(templateId) {
-            const instance = $gameSystem.getLatestInstance(templateId);
-            // getLatestInstance 会忽略 COMPLETE 的，但我们需要明确 RUNNING 或 SUCCESS
-            if (instance && (instance.status === Q_STATUS.RUNNING)) {
-                return true;
+        _checkBatch(ids, checkFn, excludeHidden) {
+            const list = Array.isArray(ids) ? ids : [ids];
+            
+            // AND 逻辑：必须所有任务都满足
+            for (const id of list) {
+                const instance = $gameSystem.getLatestInstance(id);
+                if (!instance) return false; // 没接这个任务，直接false
+                // 1. 基础状态检查
+                if (!checkFn(instance)) return false;
+                // 2. 隐藏条件检查
+                if (excludeHidden) {
+                    const tpl = CONFIG.templates[id];
+                    if (tpl && tpl.conditionFunc) {
+                        try {
+                            if (!tpl.conditionFunc.call(window)) return false;
+                        } catch (e) {
+                            // 报错默认视为显示
+                        }
+                    }
+                }
             }
-            return false;
+            return true;
+        },
+
+        /**
+         * 内部通用迭代器：处理参数并根据 mode 执行 every 或 some
+         * @param {boolean} modeEvery - true=every(全满足), false=some(任一满足)
+         * @param {number} targetStatus - 0=Running, 1=Success, 2=Fail
+         * @param {boolean} excludeHidden - 是否排除被条件隐藏的任务
+         * @param {Array} args - 传入的任务ID列表
+         */
+        _checkIterate(modeEvery, targetStatus, excludeHidden, args) {
+            // 1. 参数归一化：将参数展开并拍平，处理用户传入数组或散参的情况
+            // 例如用户传 (true, "A", "B") 或 (true, ["A", "B"]) 都能处理
+            let ids = [];
+            for (const arg of args) {
+                if (Array.isArray(arg)) ids.push(...arg);
+                else ids.push(arg);
+            }
+            
+            // 如果没传任何ID，Every默认为true(空集全真)，Some默认为false。
+            // 但在业务逻辑中，没传ID通常视为“无匹配”，这里统一返回 false 防止逻辑漏洞。
+            if (ids.length === 0) return false;
+            // 定义单项检查逻辑
+            const checkItem = (id) => {
+                const _id = '' + (id || '');
+                const instance = $gameSystem.getLatestInstance(_id);
+                
+                // 条件1：实例必须存在
+                if (!instance) return false;
+                // 条件2：必须未归档 (用户需求：不包含已完成任务)
+                if (instance.isCompleted) return false;
+                // 条件3：状态必须匹配
+                if (instance.status !== targetStatus) return false;
+                // 条件4：(可选) 排除隐藏的任务
+                if (excludeHidden) {
+                    const tpl = CONFIG.templates[_id];
+                    if (tpl && tpl.conditionFunc) {
+                        try {
+                            const isVisible = tpl.conditionFunc.call(window);
+                            if (!isVisible) return false;
+                        } catch (e) {
+                            return true; // 报错默认视为显示
+                        }
+                    }
+                }
+                return true;
+            };
+            // 2. 执行逻辑
+            if (modeEvery) {
+                return ids.every(checkItem);
+            } else {
+                return ids.some(checkItem);
+            }
+        },
+
+        // --- 1.Active (进行中: Status 0, 未完成) ---
+        /** [全满足] 所有传入的任务都必须正在进行中（且未隐藏/未完成）*/
+        everyActive(excludeHidden, ...templateIds) {
+            return this._checkIterate(true, Q_STATUS.RUNNING, excludeHidden, templateIds);
+        },
+        /** [任一满足] 传入的任务中只要有一个正在进行中 */
+        someActive(excludeHidden, ...templateIds) {
+            return this._checkIterate(false, Q_STATUS.RUNNING, excludeHidden, templateIds);
+        },
+        // --- 2.Success (已达标: Status 1, 未完成) ---
+        /** [全满足] 所有传入的任务都处于“已达标待提交”状态 */
+        everySuccess(excludeHidden, ...templateIds) {
+            return this._checkIterate(true, Q_STATUS.SUCCESS, excludeHidden, templateIds);
+        },
+        /** [任一满足] 传入的任务中只要有一个处于“已达标待提交”状态 */
+        someSuccess(excludeHidden, ...templateIds) {
+            return this._checkIterate(false, Q_STATUS.SUCCESS, excludeHidden, templateIds);
+        },
+        // --- 3.Fail (失败: Status 2, 未完成) ---
+        /** [全满足] 所有传入的任务都处于“失败”状态（且未归档） */
+        everyFail(excludeHidden, ...templateIds) {
+            // 失败任务通常不建议隐藏，但保持参数一致性
+            return this._checkIterate(true, Q_STATUS.FAIL, excludeHidden, templateIds);
+        },
+        /** [任一满足] 传入的任务中只要有一个处于“失败”状态 */
+        someFail(excludeHidden, ...templateIds) {
+            return this._checkIterate(false, Q_STATUS.FAIL, excludeHidden, templateIds);
         },
         /**
-         * 判断任务是否处在“成功”状态
-         * @param {string} templateId 
+         * [高级查询] 判断是否所有已接过的任务都已归档(Completed)，排除指定的一组ID。
+         * 
+         * 逻辑：
+         * 1. 遍历系统里所有接过的任务实例。
+         * 2. 如果任务ID在排除列表(exceptIds)中，跳过不检查（无论它是进行中还是完成）。
+         * 3. 如果任务ID不在排除列表中，它必须是 isCompleted=true。
+         * 4. 只要发现一个“非排除且未完成”的任务，立即返回 false。
+         * 
+         * @param {Array<string>} exceptIds 排除检查的任务ID列表 (例如 ["main_1", "main_2"])
          * @returns {boolean}
          */
-        isSuccess(templateId) {
-            const instance = $gameSystem.getLatestInstance(templateId);
-            // getLatestInstance 会忽略 COMPLETE 的，但我们需要明确 RUNNING 或 SUCCESS
-            if (instance && (instance.status === Q_STATUS.SUCCESS)) {
-                return true;
+        isAllCompletedExcept(exceptIds = []) {
+            const allQuests = $gameSystem.getAllQuests();
+            if (!allQuests || allQuests.length === 0) return true; // 如果一个任务都没接过，视为满足
+
+            // 归一化排除列表，确保是数组
+            const ignoreList = Array.isArray(exceptIds) ? exceptIds : [exceptIds];
+
+            for (const q of allQuests) {
+                // 如果这个任务在排除名单里，直接跳过，不管是进行中还是失败，都不影响结果
+                if (ignoreList.includes(q.templateId)) continue;
+
+                // 如果不在排除名单里，它必须是已归档状态
+                // 只有 isCompleted=true 才算过关
+                if (!q.isCompleted) {
+                    return false;
+                }
             }
-            return false;
+
+            return true;
+        },
+
+        /**
+         * 判断任务是否正在进行 (Status 0)
+         * @param {string|string[]} templateId 任务模板
+         * @param {boolean} [excludeHidden=false] 是否排除隐藏项
+         * @returns {boolean}
+         */
+        isActive(templateId, excludeHidden = false) {
+            return this._checkStatus(templateId, Q_STATUS.RUNNING, excludeHidden);
         },
         /**
-         * 判断任务是否处在“失败”状态
-         * @param {string} templateId 
+         * 判断任务是否已成功 (Status 1)
+         * @param {string|string[]} templateId 任务模板
+         * @param {boolean} [excludeHidden=false] 是否排除隐藏项
          * @returns {boolean}
          */
-        isFail(templateId) {
-            const instance = $gameSystem.getLatestInstance(templateId);
-            // getLatestInstance 会忽略 COMPLETE 的，但我们需要明确 RUNNING 或 SUCCESS
-            if (instance && (instance.status === Q_STATUS.FAIL)) {
-                return true;
-            }
-            return false;
+        isSuccess(templateId, excludeHidden = false) {
+            return this._checkStatus(templateId, Q_STATUS.SUCCESS, excludeHidden);
+        },
+        /**
+         * 判断任务是否已失败 (Status 2)
+         * @param {string|string[]} templateId 任务模板
+         * @param {boolean} [excludeHidden=false] 是否排除隐藏项
+         * @returns {boolean}
+         */
+        isFail(templateId, excludeHidden = false) {
+            return this._checkStatus(templateId, Q_STATUS.FAIL, excludeHidden);
         },
 
         /**
@@ -937,7 +1160,7 @@
          */
         countHistory(templateId) {
             let count = 0;
-            const allQuests = $gameSystem.getAllQuests(); // 访问原始数组
+            const allQuests = $gameSystem.getAllQuests();
             if (!allQuests) return 0;
             
             for (let i = 0; i < allQuests.length; i++) {
@@ -1073,19 +1296,19 @@
         return null;
     };
 
+    // 获取最新的实例（无论是否完成，只要是最后接的一个）
+    // 修改原因：现在允许查询已归档(Completed)的任务，所以不能这里过滤
     Game_System.prototype.getLatestInstance = function (templateId) {
+        // 因为是push进去的，所以倒序找就是最新的
         for (let i = this._questInstances.length - 1; i >= 0; i--) {
             if (this._questInstances[i].templateId === templateId) {
-                if (this._questInstances[i].status !== Q_STATUS.COMPLETE) {
-                    return this._questInstances[i];
-                }
+                return this._questInstances[i];
             }
         }
         return null;
     };
 
-    // 该方法仅获取“应该在HUD中显示”的数据，不负责过滤Condition
-    // Condition过滤转移到 HUD update 中动态处理
+    // HUD 数据获取逻辑：过滤掉 hidden 的 和 isCompleted 的
     Game_System.prototype.getHudData = function () {
         const groups = {};
         for (let i = 0; i < CONFIG.categories.length; i++) {
@@ -1094,13 +1317,11 @@
                 items: []
             };
         }
-
         for (let i = 0; i < this._questInstances.length; i++) {
             const q = this._questInstances[i];
             
-            // 已归档不显示
-            if (q.status === Q_STATUS.COMPLETE) continue;
-
+            // 核心修改：如果已归档(Completed)，则不在HUD显示
+            if (q.isCompleted) continue;
             if (groups[q.typeId]) {
                 groups[q.typeId].items.push(q);
             } else {
@@ -1108,7 +1329,6 @@
                 groups['_other'].items.push(q);
             }
         }
-
         return groups;
     };
 
@@ -1218,7 +1438,7 @@
             let currentVisibleState = "";
 
             for (const q of quests) {
-                if (q.status === 3) continue; // COMPLETE
+                if (q.isCompleted) continue; // COMPLETE
                 
                 const tpl = CONFIG.templates[q.templateId];
                 let isVisible = true;
@@ -1316,7 +1536,7 @@
                     CONFIG.width, 
                     totalContentHeight - CONFIG.y, 
                     CONFIG.borderRadius, 
-                    CONFIG.bgColor
+                    parseColor(CONFIG.bgColor)
                 );
             }
 
@@ -1378,7 +1598,7 @@
             if (CONFIG.headerBgColor) {
                 const hx = x + 4;
                 const hw = fullWidth - 8;
-                this.drawRoundedRect(hx, y, hw, 28, 4, CONFIG.headerBgColor);
+                this.drawRoundedRect(hx, y, hw, 28, 4, parseColor(CONFIG.headerBgColor));
             }
 
             this.bitmap.fontBold = true;
@@ -1403,62 +1623,114 @@
         }
 
         // 修改2 & 3: 标题换行修复 & 失败删除线
+        // 修改：增强版绘制逻辑，支持英文按单词换行
         drawTaskItem(instance, x, y, width, dryRun = false) {
+            const isEnglish = (typeof TranslateUtils !== 'undefined' && TranslateUtils.currentLanguage === "en-US");
             let cy = y;
             const statusConf = CONFIG.statusText[instance.status] || { text: "", color: 0 };
             const isFailed = (instance.status === 2); // 状态2为失败
             
-            const displayTitle = this.processText(instance.title, instance);
+            // 处理文本中的占位符
+            let displayTitle = this.processText(instance.title, instance);
+            if (typeof TranslateUtils !== 'undefined') {
+                displayTitle = TranslateUtils.getText(displayTitle);
+            }
+            
             const rewardText = CONFIG.templates[instance.templateId].rewardText;
 
             // 1. 绘制状态前缀
             this.bitmap.fontSize = CONFIG.fontSizeTitle;
             this.bitmap.outlineWidth = CONFIG.outlineWidth;
-            this.bitmap.outlineColor = CONFIG.outlineColor; // 使用配置颜色
+            this.bitmap.outlineColor = parseColor(CONFIG.outlineColor);
 
-            const statusText = statusConf.text;
+            let statusText = statusConf.text;
+            if (typeof TranslateUtils !== 'undefined') {
+                statusText = TranslateUtils.getText(statusText);
+            }
+            
             const statusWidth = this.bitmap.measureTextWidth(statusText);
             
             if (!dryRun) {
-                this.bitmap.textColor = statusConf.color;
+                this.bitmap.textColor = parseColor(statusConf.color);
                 this.bitmap.drawText(statusText, x, cy, width, 24, "left");
             }
 
             // 2. 准备绘制标题 (换行修复逻辑)
             const titleFirstLineX = x + statusWidth; 
-            const titleMaxW = width - statusWidth; 
+            const titleMaxW_First = width - statusWidth; 
+            const titleMaxW_Other = width;
             
             this.bitmap.textColor = isFailed ? parseColor(8) : ColorManager.normalColor();
 
-            // 构建行数组：第一行跟在前缀后，后续行顶格
+            // --- 新的核心逻辑：标题换行计算 ---
             const fullTitleLines = [];
-            let remainingText = displayTitle;
             
-            // 计算第一行
-            let firstLineText = "";
-            let i = 0;
-            while (i < remainingText.length) {
-                if (this.bitmap.measureTextWidth(firstLineText + remainingText[i]) <= titleMaxW) {
-                    firstLineText += remainingText[i];
-                    i++;
-                } else {
-                    break;
-                }
-            }
-            fullTitleLines.push(firstLineText);
-            remainingText = remainingText.substring(i);
+            if (isEnglish) {
+                // === 英文逻辑：按单词处理 ===
+                const words = displayTitle.split(" ");
+                let currentLine = "";
+                let isFirstLine = true;
+                
+                for (let i = 0; i < words.length; i++) {
+                    const word = words[i];
+                    // 尝试将单词加入当前行（注意空格）
+                    const testLine = currentLine + (currentLine.length > 0 ? " " : "") + word;
+                    const testWidth = this.bitmap.measureTextWidth(testLine);
+                    const limitWidth = isFirstLine ? titleMaxW_First : titleMaxW_Other;
 
-            // 如果还有剩余，按完整宽度切分
-            if (remainingText.length > 0) {
-                const otherLines = this.wrapText(remainingText, width);
-                fullTitleLines.push(...otherLines);
+                    if (testWidth <= limitWidth) {
+                        currentLine = testLine;
+                    } else {
+                        // 如果单个单词本身就比一行还宽，那就没办法了，只能强制换行或者切断，这里选择推到下一行
+                        // 如果当前行不为空，先保存当前行，新单词放下一行
+                        if (currentLine.length > 0) {
+                            fullTitleLines.push(currentLine);
+                            currentLine = word;
+                            isFirstLine = false;
+                        } else {
+                            // 极端情况：单词太长且当前行是空的，直接塞进去（或者可以考虑拆字符，但这很少见）
+                            fullTitleLines.push(word);
+                            currentLine = "";
+                            isFirstLine = false;
+                        }
+                    }
+                }
+                if (currentLine.length > 0) {
+                    fullTitleLines.push(currentLine);
+                }
+
+            } else {
+                // === 中文/默认逻辑：按字符处理 ===
+                let remainingText = displayTitle;
+                
+                // 第一行特殊处理（因为有前缀）
+                let firstLineText = "";
+                let i = 0;
+                while (i < remainingText.length) {
+                    // 预判加一个字符后的宽度
+                    if (this.bitmap.measureTextWidth(firstLineText + remainingText[i]) <= titleMaxW_First) {
+                        firstLineText += remainingText[i];
+                        i++;
+                    } else {
+                        break;
+                    }
+                }
+                fullTitleLines.push(firstLineText);
+                remainingText = remainingText.substring(i);
+
+                // 后续行调用 wrapText 处理
+                if (remainingText.length > 0) {
+                    const otherLines = this.wrapText(remainingText, titleMaxW_Other);
+                    fullTitleLines.push(...otherLines);
+                }
             }
 
             // 3. 绘制标题循环
             for (let i = 0; i < fullTitleLines.length; i++) {
                 const lineStr = fullTitleLines[i];
+                // 如果是第一行，X坐标要避让前缀，如果是后续行，顶格(x)
                 const drawX = (i === 0) ? titleFirstLineX : x; 
-                const drawW = (i === 0) ? titleMaxW : width;
+                const drawW = (i === 0) ? titleMaxW_First : titleMaxW_Other;
 
                 if (!dryRun) {
                     this.bitmap.drawText(lineStr, drawX, cy, drawW, 24, "left");
@@ -1468,9 +1740,8 @@
                         const lineWidth = this.bitmap.measureTextWidth(lineStr);
                         const ctx = this.bitmap.context;
                         ctx.save();
-                        ctx.strokeStyle = this.bitmap.textColor; // 线条颜色同文字
+                        ctx.strokeStyle = this.bitmap.textColor;
                         ctx.lineWidth = 2;
-                        // 清除阴影防止线条太粗
                         ctx.shadowColor = "transparent"; 
                         ctx.beginPath();
                         const lineY = cy + 12; 
@@ -1485,7 +1756,7 @@
                 if (i === fullTitleLines.length - 1 && rewardText) {
                     if (!dryRun) {
                         this.bitmap.fontSize = CONFIG.fontSizeReward;
-                        this.bitmap.textColor = CONFIG.colorReward;
+                        this.bitmap.textColor = parseColor(CONFIG.colorReward);
                         this.bitmap.drawText(rewardText, x, cy + 2, width, 24, "right");
                         this.bitmap.fontSize = CONFIG.fontSizeTitle;
                     }
@@ -1496,13 +1767,18 @@
             // 4. 绘制描述
             if (instance.desc) {
                 this.bitmap.fontSize = CONFIG.fontSizeDesc;
-                this.bitmap.textColor = CONFIG.fontColorDesc;
+                this.bitmap.textColor = parseColor(CONFIG.fontColorDesc);
                 
-                const processDesc = this.processText(instance.desc, instance);
+                let processDesc = this.processText(instance.desc, instance);
+                if (typeof TranslateUtils !== 'undefined') {
+                    processDesc = TranslateUtils.getText(processDesc);
+                }
+
                 const descLines = processDesc.split('\n');
                 
                 for (let l = 0; l < descLines.length; l++) {
                     const rawLine = descLines[l];
+                    // 调用修改后的 wrapText
                     const wrappedDescLines = this.wrapText(rawLine, width - 10);
                     
                     for (let wl = 0; wl < wrappedDescLines.length; wl++) {
@@ -1517,23 +1793,51 @@
             return cy - y; 
         }
 
+        // 修改：通用换行函数，根据语言判断切割方式
         wrapText(text, maxWidth) {
             if (!text) return [];
-            const words = text.split(""); 
-            let lines = [];
-            let currentLine = words[0];
+            const isEnglish = (typeof TranslateUtils !== 'undefined' && TranslateUtils.currentLanguage === "en-US");
 
-            for (let i = 1; i < words.length; i++) {
-                const word = words[i];
-                const width = this.bitmap.measureTextWidth(currentLine + word);
-                if (width < maxWidth) {
-                    currentLine += word;
-                } else {
-                    lines.push(currentLine);
-                    currentLine = word;
+            let lines = [];
+
+            if (isEnglish) {
+                // === 英文：空格切割 ===
+                const words = text.split(" ");
+                let currentLine = words[0];
+
+                for (let i = 1; i < words.length; i++) {
+                    const word = words[i];
+                    // 尝试 adding space + word
+                    const testLine = currentLine + " " + word;
+                    const width = this.bitmap.measureTextWidth(testLine);
+                    
+                    if (width < maxWidth) {
+                        currentLine = testLine;
+                    } else {
+                        lines.push(currentLine);
+                        currentLine = word;
+                    }
                 }
+                lines.push(currentLine);
+
+            } else {
+                // === 中文/其他：字符切割 (原逻辑) ===
+                const chars = text.split(""); 
+                let currentLine = chars[0];
+
+                for (let i = 1; i < chars.length; i++) {
+                    const char = chars[i];
+                    const width = this.bitmap.measureTextWidth(currentLine + char);
+                    if (width < maxWidth) {
+                        currentLine += char;
+                    } else {
+                        lines.push(currentLine);
+                        currentLine = char;
+                    }
+                }
+                lines.push(currentLine);
             }
-            lines.push(currentLine);
+            
             return lines;
         }
     }
@@ -1565,11 +1869,20 @@
 
     PluginManager.registerCommand(PLUGIN_NAME, "SetStatus", args => {
         let s = 0;
-        if (args.status === 'success') s = 1;
-        else if (args.status === 'fail') s = 2;
-        else if (args.status === 'complete') s = 3;
-
+        if (args.status === 'success') {
+            s = 1;
+        } else if (args.status === 'fail') {
+            s = 2;
+        } else if (args.status === 'active') {
+            s = 0;
+        }
         window.SimpleQuest.setLatestStatus(args.templateId, s);
+    });
+
+    PluginManager.registerCommand(PLUGIN_NAME, "SetCompleted", args => {
+        const isCompleted = args.completed === 'true';
+        const force = args.force === 'true';
+        window.SimpleQuest.setLatestCompleted(args.templateId, isCompleted, force);
     });
 
     PluginManager.registerCommand(PLUGIN_NAME, "AddProgress", args => {
