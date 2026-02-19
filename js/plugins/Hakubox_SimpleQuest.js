@@ -1093,18 +1093,21 @@
          * 4. 只要发现一个“非排除且未完成”的任务，立即返回 false。
          * 
          * @param {Array<string>} exceptIds 排除检查的任务ID列表 (例如 ["main_1", "main_2"])
+         * @param {Array<string>} status 排除检查的状态列表 (例如 [0, 1])
          * @returns {boolean}
          */
-        isAllCompletedExcept(exceptIds = []) {
+        isAllCompletedExcept(exceptIds = [], status = []) {
             const allQuests = $gameSystem.getAllQuests();
             if (!allQuests || allQuests.length === 0) return true; // 如果一个任务都没接过，视为满足
 
             // 归一化排除列表，确保是数组
             const ignoreList = Array.isArray(exceptIds) ? exceptIds : [exceptIds];
+            const ignoreStatusList = Array.isArray(status) ? status : [status];
 
             for (const q of allQuests) {
                 // 如果这个任务在排除名单里，直接跳过，不管是进行中还是失败，都不影响结果
                 if (ignoreList.includes(q.templateId)) continue;
+                if (ignoreStatusList.includes(q.status)) continue;
 
                 // 如果不在排除名单里，它必须是已归档状态
                 // 只有 isCompleted=true 才算过关
