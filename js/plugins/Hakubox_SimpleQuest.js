@@ -642,7 +642,7 @@
         }
     }
 
-    const CONFIG = {
+    let CONFIG = {
         x: Number(PARAMS['hudX'] || 10),
         y: Number(PARAMS['hudY'] || 10),
         width: Number(PARAMS['hudWidth'] || 320),
@@ -651,22 +651,25 @@
         sectionSpacing: Number(PARAMS['sectionSpacing'] || 24),
         
         showBg: PARAMS['showListBackground'] === 'true',
-        bgColor: parseColor(PARAMS['listBackgroundColor'] || 'rgba(0,0,0,0.5)'),
-        headerBgColor: parseColor(PARAMS['headerBackgroundColor'] || 'rgba(0,0,0,0.6)'),
+        bgColor: PARAMS['listBackgroundColor'] || 'rgba(0,0,0,0.5)',
+        headerBgColor: PARAMS['headerBackgroundColor'] || 'rgba(0,0,0,0.6)',
         borderRadius: Number(PARAMS['borderRadius'] || 8),
         
         outlineWidth: Number(PARAMS['fontOutlineWidth'] || 3),
         shadowDist: Number(PARAMS['fontShadowDistance'] || 1),
-        outlineColor: parseColor(PARAMS['fontOutlineColor'] || '#000000'),
+        outlineColor: PARAMS['fontOutlineColor'] || '#000000',
         visibleSwitchId: Number(PARAMS['visibleSwitchId'] || 0),
         hiddenOpacity: Number(PARAMS['hiddenOpacity'] || 50),
 
         fontSizeGroup: Number(PARAMS['fontSizeGroup'] || 16),
         fontSizeTitle: Number(PARAMS['fontSizeTitle'] || 15),
         fontSizeReward: Number(PARAMS['fontSizeReward'] || 14),
-        colorReward: parseColor(PARAMS['fontColorReward'] || 0), // 这里复用parseColor处理颜色
+        colorReward: PARAMS['fontColorReward'] || 0,
         fontSizeDesc: Number(PARAMS['fontSizeDesc'] || 13),
-        fontColorDesc: parseColor(PARAMS['fontColorDesc'] || 'rgba(220, 220, 220, 0.9)'),
+        fontColorDesc: PARAMS['fontColorDesc'] || 'rgba(220, 220, 220, 0.9)',
+
+        enableMapNameOpacity: PARAMS['enableMapNameOpacity'] === 'true',
+        enableMouseOpacity: PARAMS['enableMouseOpacity'] === 'true',
 
         globalSe: {
             accept: PARAMS['seAccept'],
@@ -675,9 +678,9 @@
         },
 
         statusText: {
-            0: { text: PARAMS['textRunning'], color: parseColor(PARAMS['colorRunning']) },
-            1: { text: PARAMS['textSuccess'], color: parseColor(PARAMS['colorSuccess']) },
-            2: { text: PARAMS['textFail'],    color: parseColor(PARAMS['colorFail']) },
+            0: { text: PARAMS['textRunning'], color: PARAMS['colorRunning'] },
+            1: { text: PARAMS['textSuccess'], color: PARAMS['colorSuccess'] },
+            2: { text: PARAMS['textFail'],    color: PARAMS['colorFail'] },
         },
         categories: parseStructList(PARAMS['categoryList']).sort((a, b) => Number(a.priority) - Number(b.priority)),
         templates: {}
@@ -1316,7 +1319,7 @@
                     CONFIG.width, 
                     totalContentHeight - CONFIG.y, 
                     CONFIG.borderRadius, 
-                    CONFIG.bgColor
+                    parseColor(CONFIG.bgColor)
                 );
             }
 
@@ -1378,7 +1381,7 @@
             if (CONFIG.headerBgColor) {
                 const hx = x + 4;
                 const hw = fullWidth - 8;
-                this.drawRoundedRect(hx, y, hw, 28, 4, CONFIG.headerBgColor);
+                this.drawRoundedRect(hx, y, hw, 28, 4, parseColor(CONFIG.headerBgColor));
             }
 
             this.bitmap.fontBold = true;
@@ -1414,13 +1417,13 @@
             // 1. 绘制状态前缀
             this.bitmap.fontSize = CONFIG.fontSizeTitle;
             this.bitmap.outlineWidth = CONFIG.outlineWidth;
-            this.bitmap.outlineColor = CONFIG.outlineColor; // 使用配置颜色
+            this.bitmap.outlineColor = parseColor(CONFIG.outlineColor); // 使用配置颜色
 
             const statusText = statusConf.text;
             const statusWidth = this.bitmap.measureTextWidth(statusText);
             
             if (!dryRun) {
-                this.bitmap.textColor = statusConf.color;
+                this.bitmap.textColor = parseColor(statusConf.color);
                 this.bitmap.drawText(statusText, x, cy, width, 24, "left");
             }
 
@@ -1485,7 +1488,7 @@
                 if (i === fullTitleLines.length - 1 && rewardText) {
                     if (!dryRun) {
                         this.bitmap.fontSize = CONFIG.fontSizeReward;
-                        this.bitmap.textColor = CONFIG.colorReward;
+                        this.bitmap.textColor = parseColor(CONFIG.colorReward);
                         this.bitmap.drawText(rewardText, x, cy + 2, width, 24, "right");
                         this.bitmap.fontSize = CONFIG.fontSizeTitle;
                     }
@@ -1496,7 +1499,7 @@
             // 4. 绘制描述
             if (instance.desc) {
                 this.bitmap.fontSize = CONFIG.fontSizeDesc;
-                this.bitmap.textColor = CONFIG.fontColorDesc;
+                this.bitmap.textColor = parseColor(CONFIG.fontColorDesc);
                 
                 const processDesc = this.processText(instance.desc, instance);
                 const descLines = processDesc.split('\n');
