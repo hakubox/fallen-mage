@@ -479,10 +479,10 @@
             // 注意：先替换操作符，再替换变量，避免干扰
             
             // 替换 & -> &&, | -> ||
-            let script = condStr.replace(/&/g, ' && ').replace(/\|/g, ' || ');
+            let script = condStr.replace(/(?<!&)&(?!&)/g, ' && ').replace(/(?<!\|)\|(?!\|)/g, ' || ');
             // 替换 V10 -> !!$gameVariables.value(10) (强制转布尔)
             script = script.replace(/\bV(\d+)\b/gi, (_, id) => {
-                return `!!$gameVariables.value(${id})`;
+                return `$gameVariables.value(${id})`;
             });
             // 替换 S10 -> $gameSwitches.value(10)
             script = script.replace(/\bS(\d+)\b/gi, (_, id) => {
