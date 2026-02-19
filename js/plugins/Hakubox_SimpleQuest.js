@@ -1,198 +1,377 @@
 /*:
  * @target MZ
- * @plugindesc [v3.1] 高级HUD任务系统 (Auto-Condition & Limits)
+ * @plugindesc 白箱任务系统
  * @author hakubox
+ *
  * @help
- * 
  * ============================================================================
- * Hakubox Simple Quest System (Hakubox_SimpleQuest.js)
+ *                Hakubox Simple Quest System (v1.0)
  * ============================================================================
- * 这是一个基于“模板-实例”架构的任务系统。配置是模板，接任务是创建实例。
- * 
- * [v3.1更新]
- * 1. 动态刷新：现在会每30帧检测一次显示条件，条件满足时自动显示/隐藏。
- * 2. 领取限制：支持设置单个任务的最大领取次数（例如：一次性任务）。
- * 3. API增强：提供了查询任务状态和历史记录的脚本函数。
+ * 这是一个专为 RPG Maker MZ 设计的轻量级但功能强大的任务系统。
+ * 它会在地图上直接显示任务 HUD 面板，支持任务分类、进度追踪、自动监控等功能。
  *
- * 【核心变量占位符】
- * 在任务标题、描述中可以使用以下占位符：
- * {current} - 当前进度值
- * {max}     - 最大进度值
- * 
- * 例如标题配置为： "收集史莱姆粘液 ({current}/{max})"
+ * 核心逻辑：
+ * 1. 在【插件参数】中配置好“任务分组”和“任务数据库”。
+ * 2. 在游戏事件中通过【插件指令】来发放任务、更新进度。
  *
- * 【脚本指令 (Script Calls) - 用于条件分歧】
- * 
- * 1. 判断玩家当前是否正在做某任务 (ID: quest_01)
+ * ============================================================================
+ * 【一、快速上手：创建第一个任务】
+ * ============================================================================
+ *
+ * 1. 设置分组 (Category):
+ *    打开插件参数 ➔ categoryList (任务分组配置)。
+ *    默认已有 "main" (主线) 和 "sub" (支线)。您可以修改或添加，记住ID即可。
+ *
+ * 2. 创建任务 (Quest Template):
+ *    打开 questTemplates (任务数据库)，添加一项：
+ *    - 任务ID: kill_slime (唯一标识符，切勿重复)
+ *    - 任务标题: 讨伐史莱姆 ({current}/{max})
+ *    - 所属分组: main (填入上面设置的分组ID)
+ *    - 最大进度值: 10
+ *    - 初始描述: 村长让你去村外清理10只史莱姆。
+ *    - 简短奖励预览: 500G
+ *
+ * 3. 游戏中发放任务:
+ *    创建一事件（如村长），使用插件指令 ➔ 接受任务，参数填入 kill_slime。
+ *
+ * 4. 增加进度:
+ *    在史莱姆的战斗事件或死亡公共事件中，使用插件指令 ➔ 增加进度：
+ *    - 任务ID: kill_slime
+ *    - 增加量: 1
+ *    *注：当进度达到10/10时，任务状态会自动变为“已达标(待提交)”。*
+ *
+ * 5. 完成任务:
+ *    回到村长事件，设置条件判断（脚本）：SimpleQuest.isSuccess("kill_slime")。
+ *    使用插件指令 ➔ 强制改状态 ➔ 完成(归档消失)，并给予玩家金币。
+ *
+ * ============================================================================
+ * 【二、颜色配置详解】
+ * ============================================================================
+ * 本插件所有涉及颜色的参数（如标题颜色、背景色、字体颜色等）均支持以下格式：
+ *
+ * 1. 系统色号 (System Color)
+ *    - 格式：纯数字 (如 0, 16, 23)
+ *    - 说明：对应 RPG Maker 系统图片 (Window.png) 右下角的色块索引。
+ *    - 常用：0=白, 6=黄, 18=红, 23=蓝。
+ *
+ * 2. 十六进制颜色 (Hex Color)
+ *    - 格式：#RRGGBB (如 #FFFFFF, #FF0000)
+ *    - 说明：标准的网页颜色格式，不支持透明度。
+ *
+ * 3. RGBA 颜色 (推荐用于背景/透明效果)
+ *    - 格式：rgba(红, 绿, 蓝, 透明度)
+ *    - 示例：rgba(0, 0, 0, 0.5) 代表半透明黑色。
+ *    - 说明：透明度范围是 0.0 (全透) ~ 1.0 (不透)。
+ *
+ * 应用场景：
+ * - HUD背景色推荐使用 rgba(0,0,0,0.6) 以实现半透明黑底。
+ * - 任务标题推荐使用 系统色号 以保持游戏风格统一。
+ * - 失败任务颜色推荐使用 #888888 (灰色) 或系统色号 8。
+ *
+ * ============================================================================
+ * 【三、文本占位符与格式化】
+ * ============================================================================
+ * 在“任务标题”和“任务描述”中，你可以使用以下代码动态显示数值：
+ *
+ *   {current}  ➔ 当前进度值 (如 3)
+ *   {max}      ➔ 最大进度值 (如 10)
+ *   {percent}  ➔ 当前百分比 (如 30)
+ *   {remain}   ➔ 剩余所需数量 (如 7)
+ *
+ * 示例写法：
+ * - 搜集草药： "寻找药草 ({current}/{max})" ➔ 显示 "寻找药草 (2/5)"
+ * - 探索度：   "地图探索度 {percent}%"       ➔ 显示 "地图探索度 45%"
+ *
+ * ============================================================================
+ * 【四、脚本指令手册 (Script Calls)】
+ * ============================================================================
+ * 在“条件分歧 ➔ 脚本”中使用，用于判断任务流程。
+ * 假设你的任务ID是 quest_01。
+ *
+ * 1. 判断任务是否正在进行
  *    SimpleQuest.isActive("quest_01")
- *    -> 返回 true/false
- * 
- * 2. 判断玩家是否曾经接触过某任务 (无论正在做、完成还是失败)
- *    SimpleQuest.hasHistory("quest_01")
- *    -> 返回 true/false
+ *    ➔ 返回 true (任务在列表中) / false (未接或已归档)
  *
- * 3. 获取玩家领取某任务的总次数
+ * 2. 判断是否已达标 (可以交任务了)
+ *    const q = $gameSystem.getLatestInstance("quest_01");
+ *    q && q.status === 1
+ *    *(注：status 0=进行中, 1=已达标, 2=失败, 3=已归档)*
+ *
+ * 3. 判断是否曾经接取过 (无论现在是否已完成)
+ *    SimpleQuest.hasHistory("quest_01")
+ *    ➔ 常用于“一次性任务”判断，如果不希望玩家重复接取。
+ *
+ * 4. 获取任务完成/领取过几次
  *    SimpleQuest.countHistory("quest_01")
- *    -> 返回 数字 (0, 1, 2...)
+ *    ➔ 返回数字。
  *
  * ============================================================================
- * @param ---HUD外观基础---
+ * 【五、高级功能：自动监控代码 (Automated Quests)】
+ * ============================================================================
+ * 在任务模板的“自动监控代码”栏填入 JS 代码，即无需手动调用“增加进度”指令。
+ * 系统每 15 帧会自动运行一次该代码。
+ *
+ * 【重要规则】
+ * 1. 代码环境中有变量 item 可用，指向当前任务实例。
+ * 2. 必须使用 return 返回结果。
+ *
+ * 【三种返回模式】
+ * A. 返回数字 (0, 1, 5...)
+ *    ➔ 系统会自动将任务进度更新为该数字。
+ *    ➔ *适用场景：搜集物品、持有金币、变量值同步。*
+ *    示例 (持有5个药水)：
+ *    return $gameParty.numItems($dataItems[1]);
+ *
+ * B. 返回 true
+ *    ➔ 系统直接判定任务为“已达标(待提交)”。
+ *    ➔ *适用场景：到达某地图、开关打开、等级达到。*
+ *    示例 (开关10号打开即完成)：
+ *    return $gameSwitches.value(10);
+ *
+ * C. 返回 false
+ *    ➔ 系统直接判定任务为“失败”。
+ *    ➔ *适用场景：限时任务超时、关键NPC死亡。*
+ *    示例 (变量20倒计时归零则失败)：
+ *    return $gameVariables.value(20) <= 0;
+ *
+ * ============================================================================
+ * 【六、常见问题 (FAQ)】
+ * ============================================================================
+ * Q: 任务完成了，但列表里还在？
+ * A: 任务进度满（如10/10）后状态是“已达标”，此时玩家通常需要找NPC对话“交任务”。
+ *    交任务时请使用指令“强制改状态 ➔ 完成(归档消失)”，任务才会从HUD移除。
+ *
+ * Q: 怎么做“对话即完成”的简单任务？
+ * A: 将“最大进度值”设为 1。接取任务后，对话结束时直接用指令“设置进度 ➔ 1”，
+ *    或者直接用指令“强制改状态 ➔ 成功(待提交)”。
+ *
+ * Q: HUD 把地图名遮住了怎么办？
+ * A: 插件默认开启了“地图名遮挡优化”。当左上角显示地图名时，任务栏会自动变透明。
+ *    您也可以在参数 hudY 中增加数值，让任务栏位置下移。
+ * 
+ * Q: 如何彻底隐藏任务栏（例如在看剧情时）？
+ * A: 配置参数中的 全局显示开关ID。在剧情开始前关闭该开关，结束后打开即可。
+ *
+ * ============================================================================
+ * 
+ * @param ==== 核心数据配置 ====
+ *
+ * @param categoryList
+ * @text 1. 任务分组配置
+ * @type struct<Category>[]
+ * @desc 定义任务的分组标签（如：主线、支线、委托）。
+ * @default ["{\"id\":\"main\",\"name\":\"◆ 主线剧情\",\"color\":\"6\",\"priority\":\"1\"}","{\"id\":\"sub\",\"name\":\"◆ 支线任务\",\"color\":\"0\",\"priority\":\"2\"}"]
+ *
+ * @param questTemplates
+ * @text 2. 任务数据库
+ * @type struct<QuestTemplate>[]
+ * @desc 在这里录入所有的任务详情。
+ * @default []
+ *
+ * @param ==== HUD 布局与外观 ====
  *
  * @param hudX
- * @text X坐标
+ * @text HUD X坐标
  * @type number
  * @default 10
  *
  * @param hudY
- * @text Y坐标
+ * @text HUD Y坐标
  * @type number
  * @default 10
  *
  * @param hudWidth
- * @text 列表最大宽度
+ * @text HUD 总宽度
  * @type number
  * @default 320
  *
- * @param maxRunningQuests
- * @text 全局最大同时领取数量
- * @desc 玩家身上同时存在的任务总数上限(-1为不限制)。
- * @type number
- * @min -1
- * @default -1
- *
  * @param itemPadding
- * @text 任务内容内边距
+ * @text 内容内边距
+ * @desc 文字距离背景边缘的距离。
  * @type number
  * @default 8
  *
  * @param sectionSpacing
- * @text 分组垂直间距
+ * @text 分组间距
+ * @desc “主线”组和“支线”组之间的垂直距离。
  * @type number
  * @default 24
  *
- * @param ---背景与圆角---
- *
  * @param showListBackground
- * @text 是否显示整体背景
+ * @text 显示背景黑底
  * @type boolean
  * @default true
  * 
  * @param listBackgroundColor
- * @text 整体背景色(Hex/RGBA)
+ * @text 背景颜色
+ * @desc 系统色号"0-31" 或 Hex颜色"#FFFFFF" 或RGB/RGBA颜色"rgb(0,0,0,0)"。
  * @type string
- * @default rgba(0, 0, 0, 0.5)
- *
- * @param headerBackgroundColor
- * @text 分组标题背景色
- * @type string
- * @default rgba(0, 0, 0, 0.6)
+ * @default rgba(0,0,0,0.5)
  *
  * @param borderRadius
- * @text 圆角度数
+ * @text 背景圆角
  * @type number
  * @default 8
  *
- * @param ==== 文字效果 ====
+ * @param headerBackgroundColor
+ * @text 分组标题背景色
+ * @desc 系统色号"0-31" 或 Hex颜色"#FFFFFF" 或RGB/RGBA颜色"rgb(0,0,0,0)"。
+ * @type string
+ * @default rgba(0,0,0,0.6)
+ *
+ * @param ==== 文字样式 ====
  * 
+ * @param fontSizeGroup
+ * @text 字体大小: 分组标题
+ * @type number
+ * @default 16
+ * 
+ * @param fontSizeTitle
+ * @text 字体大小: 任务标题
+ * @type number
+ * @default 15
+ * 
+ * @param fontSizeDesc
+ * @text 字体大小: 任务描述
+ * @type number
+ * @default 13
+ * 
+ * @param fontSizeReward
+ * @text 字体大小: 奖励文本
+ * @type number
+ * @default 14
+ * 
+ * @param fontColorDesc
+ * @text 字体颜色: 任务描述
+ * @desc 系统色号"0-31" 或 Hex颜色"#FFFFFF" 或RGB/RGBA颜色"rgb(0,0,0,0)"。推荐使用rgba以降低不透明度，区分层级。
+ * @type string
+ * @default rgba(220,220,220,0.9)
+ * 
+ * @param fontColorReward
+ * @text 字体颜色: 奖励文本
+ * @type number
+ * @desc 输入系统色号(如 0~31)。
+ * @default 0
+ *
  * @param fontOutlineWidth
- * @text 文字描边宽度
+ * @text 描边宽度
  * @type number
  * @default 3
  * 
- * @param fontShadowDistance
- * @text 文字阴影距离
- * @desc 0为不显示阴影
- * @type number
- * @default 1
- * 
  * @param fontOutlineColor
- * @text 文字描边/阴影颜色
- * @desc 格式：#000000 或 rgba(0,0,0,0.8)。
+ * @text 描边/阴影颜色
+ * @desc 系统色号"0-31" 或 Hex颜色"#FFFFFF" 或RGB/RGBA颜色"rgb(0,0,0,0)"。
  * @type string
  * @default #000000
  *
- * @param ==== 显示控制 ====
+ * @param fontShadowDistance
+ * @text 阴影距离
+ * @desc 0为不显示阴影。
+ * @type number
+ * @default 1
  *
- * @param visibleSwitchId
- * @text 显示开关ID
- * @desc 指定一个开关ID(1, 2...)。若设置不为0，则该开关开启时显示，关闭时隐藏。
- * @type switch
- * @default 0
- *
- * @param ==== 全局音效配置 ====
- * @desc 如果任务模板里没配音频，则使用这里的默认音频。
- *
- * @param seAccept
- * @text [默认] 接取音效
- * @type file
- * @dir audio/se/
- *
- * @param seSuccess
- * @text [默认] 成功音效
- * @type file
- * @dir audio/se/
- *
- * @param seFail
- * @text [默认] 失败音效
- * @type file
- * @dir audio/se/
- *
- * @param ==== 状态前缀文本 ====
+ * @param ==== 状态文本配置 ====
  *
  * @param textRunning
- * @text [进行中] 前缀
+ * @text [进行中] 前缀文本
  * @type string
  * @default 【进行中】
  *
  * @param colorRunning
  * @text [进行中] 颜色
- * @type number
+ * @desc 系统色号"0-31" 或 Hex颜色"#FFFFFF" 或RGB/RGBA颜色"rgb(0,0,0,0)"。
+ * @type string
  * @default 0
  *
  * @param textSuccess
- * @text [成功] 前缀
+ * @text [已完成] 前缀文本
+ * @desc 任务目标达成，但在提交之前的状态。
  * @type string
- * @default 【可提交】
+ * @default 【已达标】
  *
  * @param colorSuccess
- * @text [成功] 颜色
- * @type number
+ * @text [已完成] 颜色
+ * @desc 系统色号"0-31" 或 Hex颜色"#FFFFFF" 或RGB/RGBA颜色"rgb(0,0,0,0)"。
+ * @type string
  * @default 3
  *
  * @param textFail
- * @text [失败] 前缀
+ * @text [失败] 前缀文本
  * @type string
  * @default 【已失败】
  *
  * @param colorFail
  * @text [失败] 颜色
- * @type number
+ * @desc 系统色号"0-31" 或 Hex颜色"#FFFFFF" 或RGB/RGBA颜色"rgb(0,0,0,0)"。
+ * @type string
  * @default 10
  *
- * @param ==== 数据配置 ====
+ * @param ==== 交互与动画 ====
  *
- * @param categoryList
- * @text 1. 分组类型配置
- * @type struct<Category>[]
- * @desc 定义任务分组（主线、支线等）。
- * @default ["{\"id\":\"main\",\"name\":\"◆ 主线剧情\",\"color\":\"6\",\"priority\":\"1\"}","{\"id\":\"sub\",\"name\":\"◆ 支线任务\",\"color\":\"0\",\"priority\":\"2\"}"]
+ * @param visibleSwitchId
+ * @text 全局显示开关ID
+ * @desc 指定一个开关。开=允许显示，关=隐藏。设为0则始终允许显示。
+ * @type switch
+ * @default 0
+ * 
+ * @param hiddenOpacity
+ * @text 地图名遮挡时透明度
+ * @desc 任务栏自动变半透明的透明度（0~255）
+ * @type number
+ * @min 0
+ * @max 255
+ * @default 50
+ * 
+ * @param enableMapNameOpacity
+ * @text 地图名遮挡优化
+ * @desc 当左上角显示地图名时，任务栏自动变半透明。
+ * @type boolean
+ * @default true
+ * 
+ * @param enableMouseOpacity
+ * @text 鼠标/玩家悬停优化
+ * @desc 当鼠标或玩家在任务栏区域时，自动变半透明。
+ * @type boolean
+ * @default true
  *
- * @param questTemplates
- * @text 2. 任务库
- * @type struct<QuestTemplate>[]
- * @desc 所有的任务母版数据。
- * @default []
+ * @param ==== 游戏逻辑限制 ====
+ *
+ * @param maxRunningQuests
+ * @text 最大同时接取数
+ * @desc 玩家同时能进行的任务上限。-1为不限制。
+ * @type number
+ * @min -1
+ * @default -1
+ *
+ * @param ==== 默认音效设置 ====
+ * @desc 若任务单独配置了音效，则优先使用单独的，否则使用这里的默认值。
+ *
+ * @param seAccept
+ * @text 任务接取时
+ * @type file
+ * @dir audio/se/
+ *
+ * @param seSuccess
+ * @text 达成目标时
+ * @type file
+ * @dir audio/se/
+ *
+ * @param seFail
+ * @text 任务失败时
+ * @type file
+ * @dir audio/se/
  *
  * @command AddQuest
- * @text 接受任务
- * @desc 基于任务ID创建一个新任务实例。
+ * @text ➔ 接受任务
+ * @desc 根据任务ID领取一个新任务。
  * @arg templateId
  * @text 任务ID
+ * @desc 对应“任务库”中配置的ID。
  * @type string
  *
  * @command AddProgress
- * @text 增加进度
- * @desc 增加指定任务的进度值。如果达到最大值会自动变为成功状态。
+ * @text ➔ 增加进度
+ * @desc 增加指定任务的进度值（如杀怪数+1）。
  * @arg templateId
  * @text 任务ID
  * @type string
@@ -203,20 +382,20 @@
  * @default 1
  * 
  * @command SetProgress
- * @text 设置进度
- * @desc 直接设置指定任务的进度值。
+ * @text ➔ 设置进度
+ * @desc 直接设置进度为某数值。
  * @arg templateId
  * @text 任务ID
  * @type string
  * @arg value
- * @text 设置数值
+ * @text 目标数值
  * @type number
  * @min 0
  * @default 0
  *
  * @command SetStatus
- * @text 设置任务状态
- * @desc 修改该任务ID下最新接取的那个任务的状态。
+ * @text ➔ 强制改状态
+ * @desc 强制修改任务状态（通常用于剧情杀或直接完成）。
  * @arg templateId
  * @text 任务ID
  * @type string
@@ -231,123 +410,175 @@
  * @value complete
  *
  * @command UpdateDesc
- * @text 更新描述
- * @desc 修改该任务ID下最新接取的那个任务的描述文本。
+ * @text ➔ 更新描述
+ * @desc 修改任务描述文本（例如：任务进入第二阶段，提示变了）。
  * @arg templateId
  * @text 任务ID
  * @type string
  * @arg desc
- * @text 新描述内容
+ * @text 新的描述
  * @type multiline_string
  */
 
 /*~struct~Category:
  * @param id
  * @text 类型ID
- * @desc 唯一标识，如 main, sub
+ * @desc 英文ID，用于在任务配置中关联。如 main, sub
  * @type string
  *
  * @param name
- * @text 分组显示名称
+ * @text 显示名称
+ * @desc HUD上显示的标题文字。
  * @type string
  *
  * @param color
- * @text 标题颜色索引
- * @type number
+ * @text 标题颜色
+ * @desc 系统色号"0-31" 或 Hex颜色"#FFFFFF" 或RGB/RGBA颜色"rgb(0,0,0,0)"。
+ * @type string
  * @default 0
  *
  * @param priority
  * @text 排序优先级
+ * @desc 数字越小越靠前显示。
  * @type number
  * @default 1
- * @desc 数字越小越靠前
  */
 
 /*~struct~QuestTemplate:
+ * @param group1
+ * @text ==== 基础信息 ====
+ * 
  * @param id
- * @text 任务ID
- * @desc 调用指令时用的ID。
+ * @text 任务ID (必填)
+ * @parent group1
+ * @desc 唯一标识符，脚本和插件指令调用时使用。
  * @type string
  * 
- * @param r
- * @text 备注
- * @desc 调用指令时用的ID。
- * @type string
- *
- * @param typeId
- * @text 所属类型ID
- * @desc 对应分组配置里的ID。
- * @type combo
- * @option main
- * @option sub
- * @default main
- *
- * @param maxRepeat
- * @text 最大领取次数
- * @desc 该任务限制领取的总次数（含失败）。-1为无限。
- * @type number
- * @min -1
- * @default -1
- *
- * @param condition
- * @text 显示条件(JS代码)
- * @type string
- * @desc 返回true显示，false隐藏。为空则始终显示。
- * @default 
- *
  * @param title
  * @text 任务标题
+ * @parent group1
  * @type string
- * @desc 支持 {current} {max} 占位符。
+ * @desc 支持 {current}/{max}。
  *
- * @param maxProgress
- * @text 最大进度值
- * @type number
- * @min 1
- * @default 1
- * @desc 例如搜集10个物品，这里填10。若只是对话任务，默认为1。
+ * @param typeId
+ * @text 所属分组
+ * @parent group1
+ * @desc 填写分组配置里的ID (如 main)。
+ * @type string
+ * @default main
  * 
  * @param desc
  * @text 初始描述
+ * @parent group1
  * @type multiline_string
- * @desc 支持多行和 {current} {max}。
+ * @desc 任务下方的详细说明。支持 {current} {max}。
  *
  * @param rewardText
- * @text 奖励说明
- * @desc 显示在标题右侧（或下一行右侧）的简短文本。
+ * @text 简短奖励预览
+ * @parent group1
+ * @desc 显示在标题右侧的短文本（如：500G）。
  * @type string
  *
+ * @param group2
+ * @text ==== 进度与逻辑 ====
+ *
+ * @param maxProgress
+ * @text 最大进度值
+ * @parent group2
+ * @type number
+ * @min 1
+ * @default 1
+ * @desc 如杀10只怪填10。若只是对话任务填1。
+ * 
+ * @param maxRepeat
+ * @text 最大可领取次数
+ * @parent group2
+ * @desc -1为无限。1为一次性任务，默认为单次任务。
+ * @type number
+ * @min -1
+ * @default 1
+ *
+ * @param condition
+ * @text 显示条件 (JS)
+ * @parent group2
+ * @type string
+ * @desc 即使接了任务，也可以通过此条件临时隐藏它。返回true显示，false隐藏。为空则始终显示。
+ * @default 
+ *
+ * @param monitorCode
+ * @text 自动监控代码 (JS)
+ * @parent group2
+ * @type multiline_string
+ * @desc 返回进度数值或true/false。详见插件说明。
+ *
+ * @param group3
+ * @text ==== 事件与脚本 ====
+ *
+ * @param ceAccept
+ * @text 公共事件: 任务接取时
+ * @parent group3
+ * @type common_event
+ * @default 0
+ * 
+ * @param ceSuccess
+ * @text 公共事件: 达标时
+ * @parent group3
+ * @type common_event
+ * @default 0
+ * 
+ * @param ceComplete
+ * @text 公共事件: 完成时
+ * @parent group3
+ * @desc 提交交付任务后触发。
+ * @type common_event
+ * @default 0
+ *
+ * @param ceFail
+ * @text 公共事件: 失败时
+ * @parent group3
+ * @type common_event
+ * @default 0
+ *
+ * @param onAccept
+ * @text JS脚本: 任务接取时
+ * @parent group3
+ * @type multiline_string
+ * 
+ * @param onSuccess
+ * @text JS脚本: 达标时
+ * @parent group3
+ * @type multiline_string
+ * 
+ * @param onComplete
+ * @text JS脚本: 完成时
+ * @parent group3
+ * @type multiline_string
+ *
+ * @param group4
+ * @text ==== 自定义音效 ====
+ * 
  * @param seAccept
- * @text [音效] 接取时
+ * @text 音效: 任务接取时
+ * @parent group4
  * @type file
  * @dir audio/se/
  * 
  * @param seSuccess
- * @text [音效] 成功时
+ * @text 音效: 达标时
+ * @parent group4
  * @type file
  * @dir audio/se/
  * 
  * @param seFail
- * @text [音效] 失败时
+ * @text 音效: 失败时
+ * @parent group4
  * @type file
  * @dir audio/se/
  *
- * @param onAccept
- * @text [脚本] 接受时执行
- * @type multiline_string
- * @desc 变量 quest 可访问当前实例。
- *
- * @param onSuccess
- * @text [脚本] 成功时执行
- * @type multiline_string
- *
- * @param onFail
- * @text [脚本] 失败时执行
- * @type multiline_string
- *
- * @param onComplete
- * @text [脚本] 完成时执行
- * @type multiline_string
+ * @param r
+ * @text 编辑器备注
+ * @desc 仅用于在插件列表里方便看，不影响游戏。
+ * @type string
  */
 
 (() => {
@@ -373,6 +604,30 @@
         }
     }
 
+    /** 通用颜色解析器 */
+    function parseColor(input) {
+        if (!input) return "#000000";
+        input = String(input).trim();
+        
+        // 如果是纯数字，视为系统色号
+        if (/^\d+$/.test(input)) {
+            if (ColorManager._windowskin) {
+                return ColorManager.textColor(Number(input));
+            } else {
+                return "#000000";
+            }
+        }
+        // 否则视为CSS颜色 (#... / rgb...)
+        return input;
+    }
+
+    /** 辅助执行公共事件 */
+    function reserveCommonEvent(commonEventId) {
+        if (commonEventId > 0) {
+            $gameTemp.reserveCommonEvent(commonEventId);
+        }
+    }
+
     function generateUUID() {
         return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
             var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
@@ -395,14 +650,22 @@
         sectionSpacing: Number(PARAMS['sectionSpacing'] || 24),
         
         showBg: PARAMS['showListBackground'] === 'true',
-        bgColor: PARAMS['listBackgroundColor'] || 'rgba(0,0,0,0.5)',
-        headerBgColor: PARAMS['headerBackgroundColor'] || 'rgba(0,0,0,0.6)',
+        bgColor: parseColor(PARAMS['listBackgroundColor'] || 'rgba(0,0,0,0.5)'),
+        headerBgColor: parseColor(PARAMS['headerBackgroundColor'] || 'rgba(0,0,0,0.6)'),
         borderRadius: Number(PARAMS['borderRadius'] || 8),
         
         outlineWidth: Number(PARAMS['fontOutlineWidth'] || 3),
         shadowDist: Number(PARAMS['fontShadowDistance'] || 1),
-        outlineColor: PARAMS['fontOutlineColor'] || '#000000',
+        outlineColor: parseColor(PARAMS['fontOutlineColor'] || '#000000'),
         visibleSwitchId: Number(PARAMS['visibleSwitchId'] || 0),
+        hiddenOpacity: Number(PARAMS['hiddenOpacity'] || 50),
+
+        fontSizeGroup: Number(PARAMS['fontSizeGroup'] || 16),
+        fontSizeTitle: Number(PARAMS['fontSizeTitle'] || 15),
+        fontSizeReward: Number(PARAMS['fontSizeReward'] || 14),
+        colorReward: parseColor(PARAMS['fontColorReward'] || 0), // 这里复用parseColor处理颜色
+        fontSizeDesc: Number(PARAMS['fontSizeDesc'] || 13),
+        fontColorDesc: parseColor(PARAMS['fontColorDesc'] || 'rgba(220, 220, 220, 0.9)'),
 
         globalSe: {
             accept: PARAMS['seAccept'],
@@ -411,9 +674,9 @@
         },
 
         statusText: {
-            0: { text: PARAMS['textRunning'], color: Number(PARAMS['colorRunning']) },
-            1: { text: PARAMS['textSuccess'], color: Number(PARAMS['colorSuccess']) },
-            2: { text: PARAMS['textFail'], color: Number(PARAMS['colorFail']) },
+            0: { text: PARAMS['textRunning'], color: parseColor(PARAMS['colorRunning']) },
+            1: { text: PARAMS['textSuccess'], color: parseColor(PARAMS['colorSuccess']) },
+            2: { text: PARAMS['textFail'],    color: parseColor(PARAMS['colorFail']) },
         },
         categories: parseStructList(PARAMS['categoryList']).sort((a, b) => Number(a.priority) - Number(b.priority)),
         templates: {}
@@ -447,11 +710,17 @@
             seAccept: t.seAccept || CONFIG.globalSe.accept,
             seSuccess: t.seSuccess || CONFIG.globalSe.success,
             seFail: t.seFail || CONFIG.globalSe.fail,
+            
+            ceAccept: Number(t.ceAccept || 0),
+            ceSuccess: Number(t.ceSuccess || 0),
+            ceFail: Number(t.ceFail || 0),
+            ceComplete: Number(t.ceComplete || 0),
 
             onAccept: t.onAccept || "",
             onSuccess: t.onSuccess || "",
             onFail: t.onFail || "",
-            onComplete: t.onComplete || ""
+            onComplete: t.onComplete || "",
+            monitorCode: t.monitorCode || ""
         };
     }
 
@@ -515,7 +784,9 @@
 
             $gameSystem.addQuestInstance(instance);
             playSe(template.seAccept);
+            reserveCommonEvent(template.ceAccept);
             this._evalCode(template.onAccept, instance);
+            
             return uuid;
         },
 
@@ -538,9 +809,18 @@
             $gameSystem.requestHudRefresh();
 
             if (template) {
-                if (status === Q_STATUS.SUCCESS) this._evalCode(template.onSuccess, instance);
-                else if (status === Q_STATUS.FAIL) this._evalCode(template.onFail, instance);
-                else if (status === Q_STATUS.COMPLETE) this._evalCode(template.onComplete, instance);
+                if (status === Q_STATUS.SUCCESS) {
+                    reserveCommonEvent(template.ceSuccess);
+                    this._evalCode(template.onSuccess, instance);
+                } 
+                else if (status === Q_STATUS.FAIL) {
+                    reserveCommonEvent(template.ceFail);
+                    this._evalCode(template.onFail, instance);
+                } 
+                else if (status === Q_STATUS.COMPLETE) {
+                    reserveCommonEvent(template.ceComplete);
+                    this._evalCode(template.onComplete, instance);
+                }
             }
         },
 
@@ -601,14 +881,40 @@
         // --- 查询 API (Utility Functions) ---
 
         /**
-         * 判断任务是否处在“活跃”状态 (进行中 或 成功待提交)
+         * 判断任务是否处在“进行中”状态 (进行中 或 成功待提交)
          * @param {string} templateId 
          * @returns {boolean}
          */
         isActive(templateId) {
             const instance = $gameSystem.getLatestInstance(templateId);
             // getLatestInstance 会忽略 COMPLETE 的，但我们需要明确 RUNNING 或 SUCCESS
-            if (instance && (instance.status === Q_STATUS.RUNNING || instance.status === Q_STATUS.SUCCESS)) {
+            if (instance && (instance.status === Q_STATUS.RUNNING)) {
+                return true;
+            }
+            return false;
+        },
+        /**
+         * 判断任务是否处在“成功”状态
+         * @param {string} templateId 
+         * @returns {boolean}
+         */
+        isSuccess(templateId) {
+            const instance = $gameSystem.getLatestInstance(templateId);
+            // getLatestInstance 会忽略 COMPLETE 的，但我们需要明确 RUNNING 或 SUCCESS
+            if (instance && (instance.status === Q_STATUS.SUCCESS)) {
+                return true;
+            }
+            return false;
+        },
+        /**
+         * 判断任务是否处在“失败”状态
+         * @param {string} templateId 
+         * @returns {boolean}
+         */
+        isFail(templateId) {
+            const instance = $gameSystem.getLatestInstance(templateId);
+            // getLatestInstance 会忽略 COMPLETE 的，但我们需要明确 RUNNING 或 SUCCESS
+            if (instance && (instance.status === Q_STATUS.FAIL)) {
                 return true;
             }
             return false;
@@ -657,6 +963,69 @@
     // ======================================================================
     // 2. 存档数据扩展 (Game_System)
     // ======================================================================
+
+    // 缓存容器，不要存入存档(prototype里定义即可)，或者在initialize里定义为不可枚举
+    // 这里我们选择在运行时动态生成
+    const _monitorFuncCache = {};
+    function getMonitorFunc(templateId) {
+        if (_monitorFuncCache[templateId]) return _monitorFuncCache[templateId];
+        
+        const tpl = CONFIG.templates[templateId];
+        if (!tpl || !tpl.monitorCode) return null;
+        try {
+            // new Function 构建函数
+            const f = new Function("quest", "return " + tpl.monitorCode); // 此时 monitorCode 应该是一个表达式或函数体
+            // 如果用户写的是 "return 1", 则 new Function 变成 function(quest){ return 1 }
+            // 如果用户忘记写 return，如 "$gameParty.gold()", 我们最好容错一下，或者明确告之用户必须写 return
+            // 建议：直接 new Function("return (" + code + ")"); 不太好，因为多行代码可能包含逻辑。
+            // 采用 new Function("quest", code); 用户必须写 return。
+            const func = new Function("quest", tpl.monitorCode);
+            _monitorFuncCache[templateId] = func;
+            return func;
+        } catch (e) {
+            console.error("SimpleQuest: Monitor Code Error in " + templateId, e);
+            return null;
+        }
+    }
+
+    const _Game_System_update = Game_System.prototype.update;
+    Game_System.prototype.update = function() {
+        _Game_System_update.call(this);
+        this.updateQuestMonitor(); // 注入每帧检测
+    };
+    
+    Game_System.prototype.updateQuestMonitor = function() {
+        // 每15帧执行一次，降低性能消耗
+        if (Graphics.frameCount % 15 !== 0) return;
+        if (!this._questInstances) return;
+        for (const instance of this._questInstances) {
+            // 只监控正在进行中的任务
+            if (instance.status !== 0) continue; 
+            const func = getMonitorFunc(instance.templateId);
+            if (!func) continue;
+            try {
+                // 执行监控函数，把当前任务实例传进去，方便获取 itemsNeeded 等自定义数据
+                const result = func.call(window, instance);
+                // 逻辑分支
+                if (result === true) {
+                    // 完成
+                    window.SimpleQuest.setStatusByUuid(instance.uuid, 1); // 1 = SUCCESS
+                } else if (result === false) {
+                    // 失败
+                    window.SimpleQuest.setStatusByUuid(instance.uuid, 2); // 2 = FAIL
+                } else if (typeof result === 'number') {
+                    // 更新进度
+                    const newProgress = Math.floor(result);
+                    if (newProgress !== instance.progress) {
+                        // 利用现有API更新，它会自动处理 "进度满了变完成"
+                        window.SimpleQuest.setLatestProgress(instance.templateId, newProgress);
+                    }
+                }
+            } catch (e) {
+                console.warn("Monitor Runtime Error: " + instance.templateId, e);
+            }
+        }
+    };
 
     const _Game_System_initialize = Game_System.prototype.initialize;
     Game_System.prototype.initialize = function () {
@@ -800,49 +1169,45 @@
 
         // 新增：检测玩家或鼠标是否并在区域内
         updateOpacityInteraction() {
-            // HUD 区域判定
-            // 注意：因为我们是根据内容绘制的，背景高度是动态的。
-            // 这里为了简单，我们假设高度覆盖到屏幕下半部分或者根据上次绘制的高度。
-            // 为了准确，我们在 refresh() 里记录一下真实的 height。
             const hudX = CONFIG.x;
             const hudY = CONFIG.y;
             const hudW = CONFIG.width;
-            const hudH = this._contentHeight || 600; // 如果没画过，默认一个值
+            const hudH = this._contentHeight || 600;
+            let shouldFade = false;
+            // 1. 判断鼠标 (受开关控制)
+            if (CONFIG.enableMouseOpacity) {
+                const pX = $gamePlayer.screenX();
+                const pY = $gamePlayer.screenY();
+                const playerIn = pX > hudX && pX < hudX + hudW && pY > hudY && pY < hudY + hudH;
+                
+                if (playerIn) shouldFade = true;
+            }
 
-            // 1. 检测玩家位置 (将瓦片坐标转为屏幕坐标)
-            const pX = $gamePlayer.screenX();
-            const pY = $gamePlayer.screenY();
-            // 简单的矩形碰撞
-            const playerIn = pX > hudX && pX < hudX + hudW && pY > hudY && pY < hudY + hudH;
+            // 2. 判断玩家
+            if (!shouldFade) {
+                const mX = TouchInput.x;
+                const mY = TouchInput.y;
+                const mouseIn = mX > hudX && mX < hudX + hudW && mY > hudY && mY < hudY + hudH;
+                if (mouseIn) shouldFade = true;
+            }
 
-            // 2. 检测鼠标位置
-            const mX = TouchInput.x;
-            const mY = TouchInput.y;
-            const mouseIn = mX > hudX && mX < hudX + hudW && mY > hudY && mY < hudY + hudH;
-
-            // 3. [新增] 检测地图名称显示窗口
-            let mapNameActive = false;
-            if (SceneManager._scene instanceof Scene_Map && SceneManager._scene._mapNameWindow) {
-                const mapW = SceneManager._scene._mapNameWindow;
-                // 只有当窗口打开度大于0，且内容不透明度大于0时，才视为正在显示
-                if (mapW.openness > 0 && mapW.contentsOpacity > 0) {
-                    mapNameActive = true;
+            // 3. 判断地图名 (受开关控制)
+            if (!shouldFade && CONFIG.enableMapNameOpacity) {
+                if (SceneManager._scene instanceof Scene_Map && SceneManager._scene._mapNameWindow) {
+                    const mapW = SceneManager._scene._mapNameWindow;
+                    if (mapW.openness > 0 && mapW.contentsOpacity > 0) {
+                        shouldFade = true;
+                    }
                 }
             }
 
-            // 逻辑: 如果有干扰，目标透明度降低，否则恢复到 255
-            if (playerIn || mouseIn || mapNameActive) {
-                this._targetOpacity = 80; 
-            } else {
-                this._targetOpacity = 255;
-            }
-
-            // 渐变处理 (简单的插值)
+            this._targetOpacity = shouldFade ? CONFIG.hiddenOpacity : 255;
+            // 渐变处理 (保持原样)
             if (this.opacity > this._targetOpacity) {
-                this.opacity -= 20;
+                this.opacity -= 40;
                 if (this.opacity < this._targetOpacity) this.opacity = this._targetOpacity;
             } else if (this.opacity < this._targetOpacity) {
-                this.opacity += 20;
+                this.opacity += 40;
                 if (this.opacity > this._targetOpacity) this.opacity = this._targetOpacity;
             }
         }
@@ -1016,9 +1381,9 @@
             }
 
             this.bitmap.fontBold = true;
-            this.bitmap.fontSize = 16;
+            this.bitmap.fontSize = CONFIG.fontSizeGroup;
             this.bitmap.outlineWidth = CONFIG.outlineWidth;
-            this.bitmap.textColor = ColorManager.textColor(Number(meta.color));
+            this.bitmap.textColor = parseColor(meta.color);
             
             if (CONFIG.shadowDist > 0) {
                 this.bitmap.context.shadowColor = "rgba(0,0,0,0.8)";
@@ -1046,7 +1411,7 @@
             const rewardText = CONFIG.templates[instance.templateId].rewardText;
 
             // 1. 绘制状态前缀
-            this.bitmap.fontSize = 15;
+            this.bitmap.fontSize = CONFIG.fontSizeTitle;
             this.bitmap.outlineWidth = CONFIG.outlineWidth;
             this.bitmap.outlineColor = CONFIG.outlineColor; // 使用配置颜色
 
@@ -1054,7 +1419,7 @@
             const statusWidth = this.bitmap.measureTextWidth(statusText);
             
             if (!dryRun) {
-                this.bitmap.textColor = ColorManager.textColor(statusConf.color);
+                this.bitmap.textColor = statusConf.color;
                 this.bitmap.drawText(statusText, x, cy, width, 24, "left");
             }
 
@@ -1062,7 +1427,7 @@
             const titleFirstLineX = x + statusWidth; 
             const titleMaxW = width - statusWidth; 
             
-            this.bitmap.textColor = isFailed ? ColorManager.textColor(8) : ColorManager.normalColor();
+            this.bitmap.textColor = isFailed ? parseColor(8) : ColorManager.normalColor();
 
             // 构建行数组：第一行跟在前缀后，后续行顶格
             const fullTitleLines = [];
@@ -1118,10 +1483,10 @@
                 // 绘制奖励文本 (只在最后一行)
                 if (i === fullTitleLines.length - 1 && rewardText) {
                     if (!dryRun) {
-                        this.bitmap.fontSize = 14;
-                        this.bitmap.textColor = ColorManager.systemColor(); 
+                        this.bitmap.fontSize = CONFIG.fontSizeReward;
+                        this.bitmap.textColor = CONFIG.colorReward;
                         this.bitmap.drawText(rewardText, x, cy + 2, width, 24, "right");
-                        this.bitmap.fontSize = 16; 
+                        this.bitmap.fontSize = CONFIG.fontSizeTitle;
                     }
                 }
                 cy += 24; 
@@ -1129,8 +1494,8 @@
 
             // 4. 绘制描述
             if (instance.desc) {
-                this.bitmap.fontSize = 13;
-                this.bitmap.textColor = "rgba(220, 220, 220, 0.9)";
+                this.bitmap.fontSize = CONFIG.fontSizeDesc;
+                this.bitmap.textColor = CONFIG.fontColorDesc;
                 
                 const processDesc = this.processText(instance.desc, instance);
                 const descLines = processDesc.split('\n');
