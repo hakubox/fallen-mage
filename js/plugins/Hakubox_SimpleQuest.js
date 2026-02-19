@@ -88,7 +88,7 @@
  * 在“条件分歧 ➔ 脚本”中使用，用于判断任务流程。
  * 假设你的任务ID是 quest_01。
  *
- * 1. 判断任务是否正在进行 (含已达标)
+ * 1. 判断任务是否正在进行
  *    SimpleQuest.isActive("quest_01")
  *    ➔ 返回 true (任务在列表中) / false (未接或已归档)
  *
@@ -612,7 +612,11 @@
         
         // 如果是纯数字，视为系统色号
         if (/^\d+$/.test(input)) {
-            return ColorManager.textColor(Number(input));
+            if (ColorManager._windowskin) {
+                return ColorManager.textColor(Number(input));
+            } else {
+                return "#000000";
+            }
         }
         // 否则视为CSS颜色 (#... / rgb...)
         return input;
@@ -878,14 +882,40 @@
         // --- 查询 API (Utility Functions) ---
 
         /**
-         * 判断任务是否处在“活跃”状态 (进行中 或 成功待提交)
+         * 判断任务是否处在“进行中”状态 (进行中 或 成功待提交)
          * @param {string} templateId 
          * @returns {boolean}
          */
         isActive(templateId) {
             const instance = $gameSystem.getLatestInstance(templateId);
             // getLatestInstance 会忽略 COMPLETE 的，但我们需要明确 RUNNING 或 SUCCESS
-            if (instance && (instance.status === Q_STATUS.RUNNING || instance.status === Q_STATUS.SUCCESS)) {
+            if (instance && (instance.status === Q_STATUS.RUNNING)) {
+                return true;
+            }
+            return false;
+        },
+        /**
+         * 判断任务是否处在“成功”状态
+         * @param {string} templateId 
+         * @returns {boolean}
+         */
+        isSuccess(templateId) {
+            const instance = $gameSystem.getLatestInstance(templateId);
+            // getLatestInstance 会忽略 COMPLETE 的，但我们需要明确 RUNNING 或 SUCCESS
+            if (instance && (instance.status === Q_STATUS.SUCCESS)) {
+                return true;
+            }
+            return false;
+        },
+        /**
+         * 判断任务是否处在“失败”状态
+         * @param {string} templateId 
+         * @returns {boolean}
+         */
+        isFail(templateId) {
+            const instance = $gameSystem.getLatestInstance(templateId);
+            // getLatestInstance 会忽略 COMPLETE 的，但我们需要明确 RUNNING 或 SUCCESS
+            if (instance && (instance.status === Q_STATUS.FAIL)) {
                 return true;
             }
             return false;
