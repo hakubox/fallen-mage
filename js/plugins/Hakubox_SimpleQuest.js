@@ -1399,16 +1399,27 @@
             this.createBitmap();
             this._checkTimer = 0;
             this._lastVisibleState = ""; 
-            this._targetOpacity = 255; // 目标不透明度
+            this.opacity = 255;
         }
 
         createBitmap() {
             this.bitmap = new Bitmap(Graphics.width, Graphics.height);
         }
 
+        // --- 专门用于处理进地图瞬间的方法 ---
+        setupInitialOpacity() {
+            // 只有当开启了地图名避让，且当前地图有名字时
+            if (CONFIG.enableMapNameOpacity && $gameMap.displayName()) {
+                // 直接设为0，防止闪烁
+                this.opacity = 0;
+            } else {
+                this.opacity = 255;
+            }
+        }
+
         update() {
             super.update();
-            
+
             // 1. 处理基础可见性 (事件中隐藏 / 战斗中隐藏 / 开关控制)
             this.updateVisibility();
 
@@ -1442,7 +1453,6 @@
             this.visible = $gameSystem._questHudVisible && !$gameMap.isEventRunning() && !$gameParty.inBattle();
         }
 
-        // 新增：检测玩家或鼠标是否并在区域内
         updateOpacityInteraction() {
             const hudX = CONFIG.x;
             const hudY = CONFIG.y;
@@ -1454,7 +1464,6 @@
                 const pX = $gamePlayer.screenX();
                 const pY = $gamePlayer.screenY();
                 const playerIn = pX > hudX && pX < hudX + hudW && pY > hudY && pY < hudY + hudH;
-                
                 if (playerIn) shouldFade = true;
             }
 
@@ -1468,31 +1477,39 @@
 
             // 3. 判断地图名 (受开关控制)
             if (!shouldFade && CONFIG.enableMapNameOpacity) {
-                if (SceneManager._scene instanceof Scene_Map && SceneManager._scene._mapNameWindow) {
-                    const mapW = SceneManager._scene._mapNameWindow;
-                    if (mapW.openness > 0 && mapW.contentsOpacity > 0) {
+                const mapScene = SceneManager._scene;
+                if (mapScene instanceof Scene_Map && mapScene._mapNameWindow) {
+                    const win = mapScene._mapNameWindow;
+                    // 检测: 只要地图名窗口正在开着，或者还没完全关掉
+                    if (win.openness > 0 && win.contentsOpacity > 0) {
+                        shouldFade = true;
+                    } 
+                    // 补充检测：MZ内部地图名计时器
+                    else if ($gameMap._mapNameDuration > 0) {
                         shouldFade = true;
                     }
                 }
             }
 
-            this._targetOpacity = shouldFade ? CONFIG.hiddenOpacity : 255;
-            // 渐变处理 (保持原样)
-            if (this.opacity > this._targetOpacity) {
-                this.opacity -= 40;
-                if (this.opacity < this._targetOpacity) this.opacity = this._targetOpacity;
-            } else if (this.opacity < this._targetOpacity) {
-                this.opacity += 40;
-                if (this.opacity > this._targetOpacity) this.opacity = this._targetOpacity;
+            // 决定目标透明度
+            const target = shouldFade ? CONFIG.hiddenOpacity : 255;
+
+            // 渐变处理
+            if (this.opacity > target) {
+                this.opacity -= 30;
+                if (this.opacity < target) this.opacity = target;
+            } else if (this.opacity < target) {
+                this.opacity += 30;
+                if (this.opacity > target) this.opacity = target;
             }
         }
-
+        
         checkVisibilityCondition() {
             const quests = $gameSystem._questInstances;
             let currentVisibleState = "";
             for (let i = 0; i < quests.length; i++) {
                 const q = quests[i];
-                if (q.isCompleted) continue; // COMPLETE
+                if (q.isCompleted) continue; 
                 
                 const tpl = CONFIG.templates[q.templateId];
                 let isVisible = true;
@@ -1521,7 +1538,7 @@
             this.bitmap.outlineColor = CONFIG.outlineColor;
             
             if (CONFIG.shadowDist > 0) {
-                this.bitmap.context.shadowColor = CONFIG.outlineColor; // 使用配置的颜色作为阴影色
+                this.bitmap.context.shadowColor = CONFIG.outlineColor; 
                 this.bitmap.context.shadowBlur = 4;
                 this.bitmap.context.shadowOffsetX = CONFIG.shadowDist;
                 this.bitmap.context.shadowOffsetY = CONFIG.shadowDist;
@@ -1647,7 +1664,6 @@
             // 但为了兼容性，设为完全透明的任意颜色即可，Canvas会自动处理过渡。
             gradient.addColorStop(1, 'rgba(0,0,0,0)');
             ctx.fillStyle = gradient;
-            // --- 修改结束 ---
             ctx.shadowColor = "transparent";
             ctx.fill();
             ctx.restore();
@@ -1681,8 +1697,6 @@
                        .replace(/{percent}/g, Math.floor(instance.progress / instance.maxProgress * 100));
         }
 
-        // 修改2 & 3: 标题换行修复 & 失败删除线
-        // 修改：增强版绘制逻辑，支持英文按单词换行
         drawTaskItem(instance, x, y, width, dryRun = false) {
             const isEnglish = (typeof TranslateUtils !== 'undefined' && TranslateUtils.currentLanguage === "en-US");
             let cy = y;
@@ -1714,25 +1728,21 @@
                 this.bitmap.drawText(statusText, x, cy, width, 24, "left");
             }
 
-            // 2. 准备绘制标题 (换行修复逻辑)
             const titleFirstLineX = x + statusWidth; 
             const titleMaxW_First = width - statusWidth; 
             const titleMaxW_Other = width;
             
             this.bitmap.textColor = isFailed ? parseColor(8) : ColorManager.normalColor();
 
-            // --- 新的核心逻辑：标题换行计算 ---
             const fullTitleLines = [];
             
             if (isEnglish) {
-                // === 英文逻辑：按单词处理 ===
                 const words = displayTitle.split(" ");
                 let currentLine = "";
                 let isFirstLine = true;
                 
                 for (let i = 0; i < words.length; i++) {
                     const word = words[i];
-                    // 尝试将单词加入当前行（注意空格）
                     const testLine = currentLine + (currentLine.length > 0 ? " " : "") + word;
                     const testWidth = this.bitmap.measureTextWidth(testLine);
                     const limitWidth = isFirstLine ? titleMaxW_First : titleMaxW_Other;
@@ -1740,14 +1750,11 @@
                     if (testWidth <= limitWidth) {
                         currentLine = testLine;
                     } else {
-                        // 如果单个单词本身就比一行还宽，那就没办法了，只能强制换行或者切断，这里选择推到下一行
-                        // 如果当前行不为空，先保存当前行，新单词放下一行
                         if (currentLine.length > 0) {
                             fullTitleLines.push(currentLine);
                             currentLine = word;
                             isFirstLine = false;
                         } else {
-                            // 极端情况：单词太长且当前行是空的，直接塞进去（或者可以考虑拆字符，但这很少见）
                             fullTitleLines.push(word);
                             currentLine = "";
                             isFirstLine = false;
@@ -1759,14 +1766,10 @@
                 }
 
             } else {
-                // === 中文/默认逻辑：按字符处理 ===
                 let remainingText = displayTitle;
-                
-                // 第一行特殊处理（因为有前缀）
                 let firstLineText = "";
                 let i = 0;
                 while (i < remainingText.length) {
-                    // 预判加一个字符后的宽度
                     if (this.bitmap.measureTextWidth(firstLineText + remainingText[i]) <= titleMaxW_First) {
                         firstLineText += remainingText[i];
                         i++;
@@ -1777,24 +1780,20 @@
                 fullTitleLines.push(firstLineText);
                 remainingText = remainingText.substring(i);
 
-                // 后续行调用 wrapText 处理
                 if (remainingText.length > 0) {
                     const otherLines = this.wrapText(remainingText, titleMaxW_Other);
                     fullTitleLines.push(...otherLines);
                 }
             }
 
-            // 3. 绘制标题循环
             for (let i = 0; i < fullTitleLines.length; i++) {
                 const lineStr = fullTitleLines[i];
-                // 如果是第一行，X坐标要避让前缀，如果是后续行，顶格(x)
                 const drawX = (i === 0) ? titleFirstLineX : x; 
                 const drawW = (i === 0) ? titleMaxW_First : titleMaxW_Other;
 
                 if (!dryRun) {
                     this.bitmap.drawText(lineStr, drawX, cy, drawW, 24, "left");
 
-                    // --- 失败状态画删除线 ---
                     if (isFailed) {
                         const lineWidth = this.bitmap.measureTextWidth(lineStr);
                         const ctx = this.bitmap.context;
@@ -1811,7 +1810,6 @@
                     }
                 }
                 
-                // 绘制奖励文本 (只在最后一行)
                 if (i === fullTitleLines.length - 1 && rewardText) {
                     if (!dryRun) {
                         this.bitmap.fontSize = CONFIG.fontSizeReward;
@@ -1823,7 +1821,6 @@
                 cy += 24; 
             }
 
-            // 4. 绘制描述
             if (instance.desc) {
                 this.bitmap.fontSize = CONFIG.fontSizeDesc;
                 this.bitmap.textColor = parseColor(CONFIG.fontColorDesc);
@@ -1837,7 +1834,6 @@
                 
                 for (let l = 0; l < descLines.length; l++) {
                     const rawLine = descLines[l];
-                    // 调用修改后的 wrapText
                     const wrappedDescLines = this.wrapText(rawLine, width - 10);
                     
                     for (let wl = 0; wl < wrappedDescLines.length; wl++) {
@@ -1848,28 +1844,21 @@
                     }
                 }
             }
-
             return cy - y; 
         }
 
-        // 修改：通用换行函数，根据语言判断切割方式
         wrapText(text, maxWidth) {
             if (!text) return [];
             const isEnglish = (typeof TranslateUtils !== 'undefined' && TranslateUtils.currentLanguage === "en-US");
 
             let lines = [];
-
             if (isEnglish) {
-                // === 英文：空格切割 ===
                 const words = text.split(" ");
                 let currentLine = words[0];
-
                 for (let i = 1; i < words.length; i++) {
                     const word = words[i];
-                    // 尝试 adding space + word
                     const testLine = currentLine + " " + word;
                     const width = this.bitmap.measureTextWidth(testLine);
-                    
                     if (width < maxWidth) {
                         currentLine = testLine;
                     } else {
@@ -1878,12 +1867,9 @@
                     }
                 }
                 lines.push(currentLine);
-
             } else {
-                // === 中文/其他：字符切割 (原逻辑) ===
                 const chars = text.split(""); 
                 let currentLine = chars[0];
-
                 for (let i = 1; i < chars.length; i++) {
                     const char = chars[i];
                     const width = this.bitmap.measureTextWidth(currentLine + char);
@@ -1896,7 +1882,6 @@
                 }
                 lines.push(currentLine);
             }
-            
             return lines;
         }
     }
@@ -1915,6 +1900,12 @@
         if (this._questHud) return;
         this._questHud = new Sprite_QuestHUD();
         this.addChild(this._questHud);
+        
+        // --- 核心修复：在这里调用初始化设置 ---
+        if (this._questHud.setupInitialOpacity) {
+            this._questHud.setupInitialOpacity();
+        }
+        
         $gameSystem.requestHudRefresh();
     };
 
