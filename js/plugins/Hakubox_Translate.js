@@ -6,6 +6,7 @@
 /*:
  * @plugindesc 白箱翻译插件（MZ版本）
  * @author Hakubox
+ * @target MZ
  * 
  * @help
  * 翻译插件
@@ -87,7 +88,7 @@
 (() => {
   /** 插件名称 */
   const PluginName = document.currentScript ? decodeURIComponent(document.currentScript.src.match(/^.*\/(.+)\.js$/)[1]) : "Hakubox_Translate";
-  
+
   // #region 插件参数解释器
   class PluginParamsParser {
     constructor(predictEnable = true) {
@@ -187,18 +188,18 @@
     languages: [],
   };
   // #endregion
-  
+
   const params = PluginParamsParser.parse(PluginManager.parameters(PluginName), typeDefine);
-  
+
   if (!params.languages || params.languages.length < 1) {
     throw new Error("No language defined");
   }
 
   const Scene_Title_create = Scene_Title.prototype.create;
-  Scene_Title.prototype.create = function() {
+  Scene_Title.prototype.create = function () {
     Scene_Title_create.call(this);
 
-    document.title = translateModule.getText($dataSystem.gameTitle) + ' v' + $dataSystem.gameVersion;
+    document.title = translateModule.getText($dataSystem.gameTitle) + ($dataSystem.gameVersion ? ' v' + $dataSystem.gameVersion : '');
   }
 
   const translateModule = {
@@ -231,12 +232,12 @@
       this.language = this.allLanguage[languageIndex];
       ConfigManager.languageCode = this.language;
       this.loadLocalTranslateFile(() => {
-        document.title = translateModule.getText($dataSystem.gameTitle) + ' v' + $dataSystem.gameVersion;
+        document.title = translateModule.getText($dataSystem.gameTitle) + ($dataSystem.gameVersion ? ' v' + $dataSystem.gameVersion : '');
       });
     },
     /** 获取所有文本 */
     getAllKeyByData(content) {
-      
+
       // const regex = new RegExp(`"\\\\*?([^"*\\\\\\//<>]*?${this.checkRegExp}[^"*\\\\\\//<>]*?)\\\\*?"`, 'g');
       const regex = new RegExp(`"(\\\\*?n<.*?>)*?([^"*\\\\\\//<>]*?${this.checkRegExp}[^"*\\\\\\//<>]*?)\\\\*?"`, 'g');
       let _match;
@@ -251,7 +252,7 @@
         } else {
           _isComplete = true;
         }
-        
+
         const _value = _prevTxts.join('\\n');
         if (_isComplete && !this.keys[_value]) {
           this.keys[_value] = _value;
@@ -298,7 +299,7 @@
         const files = await fs.readdirSync(dirPath);
         const _files = files.filter(i => !i.startsWith('Hakubox-Translate-'));
         const fileCount = _files.length;
-        
+
         const _pluginsText = JSON.stringify($plugins.filter(i => i.status));
         this.getAllKeyByData(_pluginsText);
 
@@ -339,11 +340,11 @@
         // 读取目录内容
         const files = await fs.readdirSync(dirPath);
         const _files = files.filter(i => [
-          'Actors.json', 'Classes.json', 'Items.json', 'Weapons.json', 'Troops.json', 'Enemies.json', 
+          'Actors.json', 'Classes.json', 'Items.json', 'Weapons.json', 'Troops.json', 'Enemies.json',
           'States.json', 'Tilesets.json', 'System.json', 'Armors.json', 'Skills.json'
         ].includes(i));
         const fileCount = _files.length;
-        
+
         // const _pluginsText = JSON.stringify($plugins.filter(i => i.status));
         // this.getAllKeyByData(_pluginsText);
 
@@ -408,11 +409,11 @@
                     if (_index >= 0) {
                       translateModule.setLanguage(_index);
                     } else {
-                      translateModule.setLanguage(1);
+                      translateModule.setLanguage(0);
                     }
                   }
                 } else if (!_language && !ConfigManager.languageCode) {
-                  translateModule.setLanguage(1);
+                  translateModule.setLanguage(0);
                 }
               }
             })
@@ -453,7 +454,7 @@
     },
     replaceParam(text, args) {
       if (!text || typeof text !== "string") return text + '';
-      
+
       if (text.match(/\$\d+/)) {
         let _index = -1;
         return text.replace(/\$(\d+)/g, (match, p1) => {
@@ -500,7 +501,7 @@
   }
 
   // #region 系统修改
-  
+
   translateModule.loadLocalTranslateFile();
 
   // 直接输出文本翻译
@@ -511,39 +512,39 @@
   }
 
   const Window_Base_processCharacter = Window_Base.prototype.processCharacter;
-  Window_Base.prototype.processCharacter = function(textState) {
+  Window_Base.prototype.processCharacter = function (textState) {
     const _text = translateModule.getText(textState.text);
     textState.text = _text;
     Window_Base_processCharacter.call(this, textState);
   }
 
   const Sprite_processCharacter = Sprite.prototype.processCharacter;
-  Sprite.prototype.processCharacter = function(textState) {
+  Sprite.prototype.processCharacter = function (textState) {
     const _text = translateModule.getText(textState.text);
     textState.text = _text;
     Sprite_processCharacter.call(this, textState);
   }
 
   // 默认对话文本翻译
-  Game_Message.prototype.allText = function() {
+  Game_Message.prototype.allText = function () {
     return translateModule.getText((this._texts || []).join('\n'));
   };
-  
+
   // 替换图片
   const ImageManager_loadNormalBitmap = ImageManager.loadNormalBitmap;
-  ImageManager.loadNormalBitmap = function(path, hue) {
+  ImageManager.loadNormalBitmap = function (path, hue) {
     const _path = translateModule.getPath(path);
     return ImageManager_loadNormalBitmap.call(this, _path, hue);
   }
 
   const ImageManager_loadBitmapFromUrl = ImageManager.loadBitmapFromUrl;
-  ImageManager.loadBitmapFromUrl = function(path) {
+  ImageManager.loadBitmapFromUrl = function (path) {
     const _path = translateModule.getPath(path);
     return ImageManager_loadBitmapFromUrl.call(this, _path);
   };
 
   const Game_Message_setChoices = Game_Message.prototype.setChoices;
-  Game_Message.prototype.setChoices = function(choices, defaultType, cancelType) {
+  Game_Message.prototype.setChoices = function (choices, defaultType, cancelType) {
     choices = choices.map(choice => translateModule.getText(choice));
     Game_Message_setChoices.call(this, choices, defaultType, cancelType);
   };
@@ -552,20 +553,20 @@
 
   // #region 配置功能
 
-  Window_Options.prototype.booleanStatusText = function(value) {
+  Window_Options.prototype.booleanStatusText = function (value) {
     return value ? translateModule.getOn() : translateModule.getOff();
   };
 
   const Window_Options_addGeneralOptions = Window_Options.prototype.addGeneralOptions;
-  Window_Options.prototype.addGeneralOptions = function() {
+  Window_Options.prototype.addGeneralOptions = function () {
     this.addCommand(translateModule.getText(translateModule.getOption()), "languageIndex");
     Window_Options_addGeneralOptions.call(this);
   };
 
   const Window_Options_statusText = Window_Options.prototype.statusText;
-  Window_Options.prototype.statusText = function(index) {
+  Window_Options.prototype.statusText = function (index) {
     const symbol = this.commandSymbol(index);
-      const value = this.getConfigValue(symbol);
+    const value = this.getConfigValue(symbol);
     if (symbol === "languageIndex") {
       return translateModule.getLabel(value);
     } else {
@@ -574,7 +575,7 @@
   };
 
   const Window_Options_processOk = Window_Options.prototype.processOk;
-  Window_Options.prototype.processOk = function() {
+  Window_Options.prototype.processOk = function () {
     const index = this.index();
     const symbol = this.commandSymbol(index);
     if (symbol === "languageIndex") {
@@ -586,7 +587,7 @@
   };
 
   const Window_Options_cursorRight = Window_Options.prototype.cursorRight;
-  Window_Options.prototype.cursorRight = function() {
+  Window_Options.prototype.cursorRight = function () {
     const index = this.index();
     const symbol = this.commandSymbol(index);
     if (symbol === "languageIndex") {
@@ -598,7 +599,7 @@
   };
 
   const Window_Options_cursorLeft = Window_Options.prototype.cursorLeft;
-  Window_Options.prototype.cursorLeft = function() {
+  Window_Options.prototype.cursorLeft = function () {
     const index = this.index();
     const symbol = this.commandSymbol(index);
     if (symbol === "languageIndex") {
@@ -610,7 +611,7 @@
   };
 
   // New function.
-  Window_Options.prototype.refreshLanguage = function() {
+  Window_Options.prototype.refreshLanguage = function () {
     translateModule.loadLocalTranslateFile(() => {
       document.title = translateModule.getText($dataSystem.gameTitle) + ' v' + $dataSystem.gameVersion;
       const _scene = SceneManager._scene;
@@ -626,7 +627,7 @@
     });
   };
 
-  Window_ChoiceList.prototype.maxChoiceWidth = function() {
+  Window_ChoiceList.prototype.maxChoiceWidth = function () {
     let maxWidth = 96;
     const choices = $gameMessage.choices();
     for (const choice of choices) {
@@ -641,14 +642,14 @@
     return maxWidth + 4;
   };
 
-  String.prototype.format = function() {
+  String.prototype.format = function () {
     var args = arguments;
-    return TranslateUtils.getText(this).replace(/%([0-9]+)/g, function(s, n) {
+    return TranslateUtils.getText(this).replace(/%([0-9]+)/g, function (s, n) {
       return TranslateUtils.getText(args[Number(n) - 1]);
     });
   };
 
-  Window_BattleLog.prototype.drawLineText = function(index) {
+  Window_BattleLog.prototype.drawLineText = function (index) {
     const rect = this.lineRect(index);
     this.contents.clearRect(rect.x, rect.y, rect.width, rect.height);
 
@@ -661,7 +662,7 @@
 
       const _re = this._lines[index];
       _re[0] = _re[0].replace(/%(\d+)/g, (a, b) => {
-          return '$' + b;
+        return '$' + b;
       });
       this.drawTextEx(TranslateUtils.getText(_re[0], _re.slice(1)), rect.x, rect.y, rect.width);
     }
@@ -669,10 +670,113 @@
 
   // 延时
   setTimeout(() => {
-    Window_SavefileList.prototype.drawFileId = function(id, x, y) {
+    Window_SavefileList.prototype.drawFileId = function (id, x, y) {
       this.drawText(translateModule.getText(TextManager.file) + ' ' + id, x, y, 120);
     };
   }, 100);
+
+  // #endregion
+
+  // ==========================================================================
+  // #region 滚动文字自动折行修复 (Auto Word Wrap for Scrolling Text) - 最终版
+  // ==========================================================================
+
+  /**
+   * 辅助函数：手动计算折行
+   * @param {string} text - 输入的原始文本
+   * @param {number} maxWidth - 允许的最大宽度
+   * @param {number} fontSize - 字体大小
+   * @returns {string} - 处理后带换行的文本
+   */
+  function wordWrap(text, maxWidth, fontSize) {
+    if (!text) return "";
+
+    // 创建一个临时的 Bitmap用于测量文本宽度
+    const bitmap = new Bitmap(1, 1);
+    bitmap.fontSize = fontSize;
+
+    // 粗略判断是否包含CJK字符（中日韩），如果有则按字符切分，否则按单词切分
+    const isCJK = /[\u4e00-\u9fa5\u3040-\u30ff\uac00-\ud7af]/.test(text);
+
+    let result = "";
+    const lines = text.split('\n'); // 先处理原有的换行符
+
+    for (let i = 0; i < lines.length; i++) {
+      let line = lines[i];
+      let currentLine = "";
+
+      if (isCJK) {
+        // CJK 处理逻辑：逐字扫描
+        for (let j = 0; j < line.length; j++) {
+          const char = line[j];
+          // 预判加了这个字是否超宽
+          if (bitmap.measureTextWidth(currentLine + char) > maxWidth) {
+            result += currentLine + "\n";
+            currentLine = char;
+          } else {
+            currentLine += char;
+          }
+        }
+        result += currentLine;
+      } else {
+        // 英文/西欧语言处理逻辑：按单词扫描
+        const words = line.split(' ');
+        for (let j = 0; j < words.length; j++) {
+          const word = words[j];
+          // 预判加了这个词是否超宽
+          const testLine = currentLine + (currentLine.length > 0 ? " " : "") + word;
+
+          if (bitmap.measureTextWidth(testLine) > maxWidth && currentLine.length > 0) {
+            result += currentLine + "\n";
+            currentLine = word; // 新起一行
+          } else {
+            // 没超宽，接在后面
+            currentLine = (currentLine.length > 0 ? currentLine + " " : "") + word;
+          }
+        }
+        result += currentLine;
+      }
+
+      // 还原原本的换行符（最后一行除外）
+      if (i < lines.length - 1) {
+        result += "\n";
+      }
+    }
+
+    return result;
+  }
+
+  // 覆盖 Window_ScrollText 的 startMessage 方法
+  // 这是绘制文字的核心逻辑，我们在绘制前一刻把文字切好
+  const _Window_ScrollText_startMessage = Window_ScrollText.prototype.startMessage;
+  Window_ScrollText.prototype.startMessage = function () {
+    _Window_ScrollText_startMessage.call(this);
+
+    this._text = $gameMessage.allText();
+
+    if (this._text) {
+      let text = this._text.split('\n').map(i => TranslateUtils.getText(i)).join('\n').replace(/(?<!\n)\n(?!\n)/g, '');
+      
+      const padding = 36;
+      const maxWidth = Graphics.boxWidth - padding;
+      const fontSize = $gameSystem.mainFontSize();
+
+      // 2. 进行折行处理
+      const wrappedText = wordWrap(text, maxWidth, fontSize);
+      this._text = wrappedText;
+
+      this.updatePlacement();
+      this._allTextHeight = this.textSizeEx(this._text).height;
+      this._blockHeight = this._maxBitmapHeight - this.height;
+      this._blockIndex = 0;
+      this.origin.y = this._scrollY = -this.height;
+      this.createContents();
+      this.refresh();
+      this.show();
+    } else {
+      $gameMessage.clear();
+    }
+  };
 
   // #endregion
 
@@ -680,7 +784,7 @@
   ConfigManager.languageCode = '';
 
   const ConfigManager_makeData = ConfigManager.makeData;
-  ConfigManager.makeData = function() {
+  ConfigManager.makeData = function () {
     const config = ConfigManager_makeData.call(this);
     config.languageIndex = this.languageIndex;
     translateModule.setLanguage(this.languageIndex);
@@ -688,7 +792,7 @@
   };
 
   const ConfigManager_applyData = ConfigManager.applyData;
-  ConfigManager.applyData = function(config) {
+  ConfigManager.applyData = function (config) {
     ConfigManager_applyData.call(this, config);
     this.languageIndex = config.languageIndex || 0;
     this.languageCode = config.languageCode || '';
@@ -738,7 +842,7 @@
      * @param {(cb: Function) => void} callback 回调函数
      * @param {number} [delay=100] 等待毫秒数
      */
-    window.useWait = function(callback, delay = 100) {
+    window.useWait = function (callback, delay = 100) {
       let _isComplete = false;
       let _currentIndex = 0;
       let _maxCount = 100;

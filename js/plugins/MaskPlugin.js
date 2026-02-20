@@ -1,6 +1,7 @@
 /*:
  * @plugindesc Allows to use image masking on pictures
  * @version 1.0
+ * @target MV MZ
  *
  * @help
  *
@@ -17,22 +18,20 @@
  *
  */
 
-(function() {
+(function () {
 
 	var _Game_Interpreter_pluginCommand = Game_Interpreter.prototype.pluginCommand;
-	Game_Interpreter.prototype.pluginCommand = function(command, args) {
+	Game_Interpreter.prototype.pluginCommand = function (command, args) {
 		_Game_Interpreter_pluginCommand.call(this, command, args);
 
-		///console.log(command);
-		if( command == 'SETMASK' ){
-			///console.log('APPLY');
-			id_1 = args[0]-1;
-			id_2 = args[1]-1;
+		if (command === 'SETMASK') {
+			id_1 = Number(args[0]) - 1;
+			id_2 = Number(args[1]) - 1;
 			SceneManager._scene._spriteset._pictureContainer.children[id_1].mask = SceneManager._scene._spriteset._pictureContainer.children[id_2];
 		}
 
-		if( command == 'REMOVEMASK' ){
-			id_1 = args[0]-1;
+		if (command === 'REMOVEMASK') {
+			id_1 = Number(args[0]) - 1;
 			SceneManager._scene._spriteset._pictureContainer.children[id_1].mask = false;
 		}
 	}

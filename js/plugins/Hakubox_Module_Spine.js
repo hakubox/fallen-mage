@@ -6,8 +6,6 @@
  * @target MZ
  * @plugindesc v2.0.0 强大的Spine基础插件，支持平滑过渡和高级配置。
  * @author Tsumio
- * @base PIXI
- * @orderAfter pixi-spine
  *
  * @help
  * Hakubox_Module_Spine.js (v2.0.0)

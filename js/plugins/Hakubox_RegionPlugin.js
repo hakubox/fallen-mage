@@ -8,7 +8,7 @@
  * @version 1.0.0
  * @author hakubox
  * @email hakubox@outlook.com
- * @target MV
+ * @target MV MZ
  * 
  *
  * @help
