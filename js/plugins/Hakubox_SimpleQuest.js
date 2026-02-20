@@ -1724,7 +1724,7 @@
 
         processText(text, instance) {
             if (!text) return "";
-            return text.replace(/{current}/g, instance.progress)
+            return TranslateUtils.getText(text).replace(/{current}/g, instance.progress)
                        .replace(/{max}/g, instance.maxProgress)
                        .replace(/{remain}/g, instance.maxProgress - instance.progress)
                        .replace(/{percent}/g, Math.floor(instance.progress / instance.maxProgress * 100));
