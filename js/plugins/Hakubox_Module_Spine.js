@@ -1107,24 +1107,30 @@
         case 'coat':
           Utils_Spine.fernClothKey2 = 'coat';
           _skins = 'clothes/coat';
+          $gameParty.leader().setCharacterImage("default-people", 4);
           break;
         case 'clothing':
           Utils_Spine.fernClothKey2 = 'clothing';
           _skins = 'clothes/clothing';
+          $gameParty.leader().setCharacterImage("fern", 1);
           break;
         case 'body':
           Utils_Spine.fernClothKey2 = 'body';
           _skins = 'clothes/body';
+          $gameParty.leader().setCharacterImage("default-people", 0);
           break;
         case 'maternity':
           _skins = 'clothes/body,clothes/body1,clothes/clothing1';
+          $gameParty.leader().setCharacterImage("fern", 4);
           break;
         case 'fetation':
           _skins = 'clothes/body,clothes/body1';
+          $gameParty.leader().setCharacterImage("fern", 0);
           break;
         default:
           break;
       }
+      $gamePlayer.refresh();
 
       // 特殊处理怀孕时的动画
       if (cloth === 'maternity' || cloth === 'fetation') {
@@ -1155,19 +1161,26 @@
       let _skins = '';
       let _colorIndex = ['normal', 'light', 'dark'].indexOf(color);
 
+      let _skinMap = {
+        hl: ['', '1', '2'],
+        hr: ['', '2', '1'],
+        hr1: ['2', '3', '1'],
+        t: ['1', '2', '3']
+      }
+
       if (Utils_Spine.fernClothKey === 'clothing') {
         switch (action) {
           case 'normal': // 正常（非H）
             _skins = '';
             break;
           case 'rub_l_breast': // 揉左胸
-            _skins = `sex/hl${_colorIndex || ''},sex/hr${_colorIndex || ''},sex/pinch`;
+            _skins = `sex/hl${_skinMap.hl[_colorIndex] || ''},sex/hr${_skinMap.hr[_colorIndex] || ''},sex/pinch`;
             break;
           case 'suck_nip': // 吸乳
-            _skins = `sex/absorb,sex/t${_colorIndex + 1}`;
+            _skins = `sex/absorb,sex/t${_skinMap.t[_colorIndex] || ''}`;
             break;
           case 'rub_breasts': // 揉双乳
-            _skins = `sex/rub,sex/hl${_colorIndex || ''},sex/hr1${3 - _colorIndex}`;
+            _skins = `sex/rub,sex/hl${_skinMap.hl[_colorIndex] || ''},sex/hr1${_skinMap.hr1[_colorIndex] || ''}`;
             break;
           default:
             break;
@@ -1178,13 +1191,13 @@
             _skins = '';
             break;
           case 'rub_l_breast': // 揉左胸
-            _skins = `sex/hl${_colorIndex || ''},sex/hr${_colorIndex || ''},sex/pinch1`;
+            _skins = `sex/hl${_skinMap.hl[_colorIndex] || ''},sex/hr${_skinMap.hr[_colorIndex] || ''},sex/pinch1`;
             break;
           case 'suck_nip': // 吸乳
-            _skins = `sex/absorbe1,sex/t${_colorIndex + 1}`;
+            _skins = `sex/absorbe1,sex/t${_skinMap.t[_colorIndex] || ''}`;
             break;
           case 'rub_breasts': // 揉双乳
-            _skins = `sex/rub1,sex/hl${_colorIndex || ''},sex/hr1${3 - _colorIndex}`;
+            _skins = `sex/rub1,sex/hl${_skinMap.hl[_colorIndex] || ''},sex/hr1${_skinMap.hr1[_colorIndex] || ''}`;
             break;
           default:
             break;
