@@ -139,7 +139,8 @@
  * C. 判断【特定任务外的全清】(高级反向查询)
  *    // 场景：除了主线(main_quest)以外，其他的(支线/隐藏)任务全都做完归档了吗？
  *    // 返回 true 表示全都做完了(除了 main_quest)。
- *    SimpleQuest.isAllCompletedExcept(["main_quest"])
+ *    // 后面的1,2代表排除掉成功和失败的任务，true代表排除掉隐藏的任务
+ *    SimpleQuest.isAllCompletedExcept(["main_quest"], [1,2], true)
  *
  *    // 场景：判断是否所有接过的任务都已彻底完成/归档？(不排除任何任务)
  *    SimpleQuest.isAllCompletedExcept()
@@ -466,6 +467,7 @@
  * @value fail
  * @option 进行中
  * @value active
+ * @default success
  * 
  * @command SetCompleted
  * @text ➔ 设置归档状态
@@ -475,9 +477,15 @@
  * @type string
  * @arg completed
  * @text 是否归档
+ * @desc 取消归档的话若未达标则重新显示
+ * @type boolean
+ * @on 归档隐藏
+ * @off 取消归档
+ * @default true
+ * @arg force
+ * @text 是否强制
  * @type boolean
  * @default true
- * @desc true=归档隐藏, false=取消归档(若未达标则重新显示)
  *
  * @command UpdateDesc
  * @text ➔ 更新描述
@@ -488,6 +496,14 @@
  * @arg desc
  * @text 新的描述
  * @type multiline_string
+ * 
+ * @command ShowHud
+ * @text ➔ 显示任务栏
+ * @desc 开启任务栏显示。注意：如果配置了“全局显示开关ID”且该开关是关闭状态，此指令无效。
+ * 
+ * @command HideHud
+ * @text ➔ 隐藏任务栏
+ * @desc 强制关闭任务栏显示。
  */
 
 /*~struct~Category:
@@ -809,7 +825,19 @@
     // ======================================================================
 
     window.SimpleQuest = {
-        
+        showHud() {
+            $gameSystem._questHudVisible = true;
+            // 强制刷新一次HUD以确保状态同步
+            if ($gameSystem.requestHudRefresh) {
+                $gameSystem.requestHudRefresh();
+            }
+        },
+        hideHud() {
+            $gameSystem._questHudVisible = false;
+            if ($gameSystem.requestHudRefresh) {
+                $gameSystem.requestHudRefresh();
+            }
+        },
         // --- 核心操作 ---
 
         addQuest(templateId) {
@@ -1014,7 +1042,8 @@
             // 1. 参数归一化：将参数展开并拍平，处理用户传入数组或散参的情况
             // 例如用户传 (true, "A", "B") 或 (true, ["A", "B"]) 都能处理
             let ids = [];
-            for (const arg of args) {
+            for (let i = 0; i < args.length; i++) {
+                const arg = args[i];
                 if (Array.isArray(arg)) ids.push(...arg);
                 else ids.push(arg);
             }
@@ -1094,17 +1123,19 @@
          * 
          * @param {Array<string>} exceptIds 排除检查的任务ID列表 (例如 ["main_1", "main_2"])
          * @param {Array<string>} status 排除检查的状态列表 (例如 [0, 1])
+         * @param {boolean} [exceptHidden=true] 是否排除隐藏任务
          * @returns {boolean}
          */
-        isAllCompletedExcept(exceptIds = [], status = []) {
-            const allQuests = $gameSystem.getAllQuests();
+        isAllCompletedExcept(exceptIds = [], status = [], exceptHidden = true) {
+            const allQuests = $gameSystem.getAllQuests(!exceptHidden);
             if (!allQuests || allQuests.length === 0) return true; // 如果一个任务都没接过，视为满足
 
             // 归一化排除列表，确保是数组
             const ignoreList = Array.isArray(exceptIds) ? exceptIds : [exceptIds];
             const ignoreStatusList = Array.isArray(status) ? status : [status];
 
-            for (const q of allQuests) {
+            for (let i = 0; i < allQuests.length; i++) {
+                const q = allQuests[i];
                 // 如果这个任务在排除名单里，直接跳过，不管是进行中还是失败，都不影响结果
                 if (ignoreList.includes(q.templateId)) continue;
                 if (ignoreStatusList.includes(q.status)) continue;
@@ -1225,7 +1256,8 @@
         // 每15帧执行一次，降低性能消耗
         if (Graphics.frameCount % 15 !== 0) return;
         if (!this._questInstances) return;
-        for (const instance of this._questInstances) {
+        for (let i = 0; i < this._questInstances.length; i++) {
+            const instance = this._questInstances[i];
             // 只监控正在进行中的任务
             if (instance.status !== 0) continue; 
             const func = getMonitorFunc(instance.templateId);
@@ -1288,8 +1320,27 @@
         return count;
     };
 
-    Game_System.prototype.getAllQuests = function () {
-        return this._questInstances;
+    Game_System.prototype.getAllQuests = function (includeHidden = true) {
+        // 如果需要获取隐藏任务（默认），直接返回所有
+        if (includeHidden) {
+            return this._questInstances;
+        }
+        // 否则进行过滤：筛除掉那些 conditionFunc 返回 false 的任务
+        return this._questInstances.filter(q => {
+            const tpl = CONFIG.templates[q.templateId];
+            // 如果模板不存在，默认视为存在的
+            if (!tpl) return true;
+            // 如果没有配置条件，默认是显示的
+            if (!tpl.conditionFunc) return true;
+            
+            try {
+                // 执行条件函数，返回 truthy 则保留，falsy 则过滤
+                return tpl.conditionFunc.call(window);
+            } catch (e) {
+                // 如果条件执行报错，为了安全起见默认视为可见
+                return true;
+            }
+        });
     };
 
     Game_System.prototype.getQuestByUuid = function (uuid) {
@@ -1439,8 +1490,8 @@
         checkVisibilityCondition() {
             const quests = $gameSystem._questInstances;
             let currentVisibleState = "";
-
-            for (const q of quests) {
+            for (let i = 0; i < quests.length; i++) {
+                const q = quests[i];
                 if (q.isCompleted) continue; // COMPLETE
                 
                 const tpl = CONFIG.templates[q.templateId];
@@ -1493,9 +1544,11 @@
 
                 const visibleItems = group.items.filter(q => {
                     const tpl = CONFIG.templates[q.templateId];
-                    if (tpl && tpl.conditionFunc) {
-                        try { return tpl.conditionFunc.call(window); } 
-                        catch (e) { return true; }
+                    if (tpl) {
+                        if (tpl.conditionFunc) {
+                            try { return tpl.conditionFunc.call(window); } 
+                            catch (e) { return true; }
+                        }
                     }
                     return true;
                 });
@@ -1504,10 +1557,11 @@
 
                 const groupStartY = currentTempY;
                 
-                let groupHeight = 32; 
-                for (const item of visibleItems) {
-                     const h = this.drawTaskItem(item, 0, 0, CONFIG.width - CONFIG.itemPadding * 2, true);
-                     groupHeight += h + CONFIG.itemPadding;
+                let groupHeight = 32;
+                for (let i = 0; i < visibleItems.length; i++) {
+                    const item = visibleItems[i];
+                    const h = this.drawTaskItem(item, 0, 0, CONFIG.width - CONFIG.itemPadding * 2, true);
+                    groupHeight += h + CONFIG.itemPadding;
                 }
 
                 layoutInfo.push({
@@ -1547,13 +1601,15 @@
             const dx = CONFIG.x + CONFIG.itemPadding;
             const dw = CONFIG.width - CONFIG.itemPadding * 2;
 
-            for (const layout of layoutInfo) {
+            for (let i = 0; i < layoutInfo.length; i++) {
+                const layout = layoutInfo[i];
                 let dy = layout.y;
 
                 this.drawGroupTitle(layout.groupMeta, CONFIG.x, dy, CONFIG.width);
                 dy += 32;
 
-                for (const item of layout.items) {
+                for (let o = 0; o < layout.items.length; o++) {
+                    const item = layout.items[o];
                     const itemH = this.drawTaskItem(item, dx, dy, dw, false);
                     dy += itemH + CONFIG.itemPadding;
                 }
@@ -1900,6 +1956,14 @@
 
     PluginManager.registerCommand(PLUGIN_NAME, "UpdateDesc", args => {
         window.SimpleQuest.updateLatestDesc(args.templateId, args.desc);
+    });
+
+    PluginManager.registerCommand(PLUGIN_NAME, "ShowHud", args => {
+        window.SimpleQuest.showHud();
+    });
+
+    PluginManager.registerCommand(PLUGIN_NAME, "HideHud", args => {
+        window.SimpleQuest.hideHud();
     });
 
 })();
