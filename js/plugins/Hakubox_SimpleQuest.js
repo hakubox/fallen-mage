@@ -594,14 +594,14 @@
  * @text 显示条件 (JS)
  * @parent group2
  * @type string
- * @desc 即使接了任务，也可以通过此条件临时隐藏它。返回true显示，false隐藏。为空则始终显示。
+ * @desc 即使接了任务，也可以通过此条件临时隐藏它。返回true显示，false隐藏。为空则始终显示。【另外允许使用简化判断条件】
  * @default 
  *
  * @param monitorCode
  * @text 自动监控代码 (JS)
  * @parent group2
  * @type multiline_string
- * @desc 返回进度数值或true/false。详见插件说明。
+ * @desc 返回进度数值或true/false。详见插件说明。【另外允许使用简化判断条件】
  *
  * @param group3
  * @text ==== 事件与脚本 ====
@@ -708,6 +708,30 @@
         return input;
     }
 
+    // ===================================
+    // [新增] 简写语法编译器
+    // ===================================
+    function compileCondition(codeStr) {
+        if (!codeStr || codeStr.trim() === "") return "";
+        
+        let script = codeStr;
+        // 1. 替换逻辑运算符 (防止与位运算混淆，先替换)
+        // 将单个 & 替换为 &&, 单个 | 替换为 || (排除已经是 && 或 || 的情况)
+        script = script.replace(/(?<!&)&(?!&)/g, ' && ').replace(/(?<!\|)\|(?!\|)/g, ' || ');
+        // 2. 替换变量 V10 -> $gameVariables.value(10)
+        // 注意：在逻辑判断中常需要布尔值，但在监控代码(return V10)中可能需要数值
+        // 因此这里不做 !! 强制转换，让 JS 自动处理 (0为false, 非0为true)
+        script = script.replace(/\bV(\d+)\b/gi, (_, id) => {
+            return `$gameVariables.value(${id})`;
+        });
+        // 3. 替换开关 S10 -> $gameSwitches.value(10)
+        script = script.replace(/\bS(\d+)\b/gi, (_, id) => {
+            return `$gameSwitches.value(${id})`;
+        });
+        // (注：任务系统通常是全局的，不涉及独立开关 A-D，因此此处不予处理)
+        return script;
+    }
+
     /** 辅助执行公共事件 */
     function reserveCommonEvent(commonEventId) {
         if (commonEventId > 0) {
@@ -778,21 +802,25 @@
         const t = tempArr[i];
         let _desc = t.desc || '';
         
+        // --- [修改开始]：预编译 Condition ---
         let _condFunc = null;
-        if (t.condition && t.condition.trim() !== "") {
+        const rawCond = t.condition ? t.condition.trim() : "";
+        if (rawCond !== "") {
             try {
-                _condFunc = new Function("return (" + t.condition + ");");
+                // 先进行简写转换，再生成函数
+                const compiledJs = compileCondition(rawCond);
+                _condFunc = new Function("return (" + compiledJs + ");");
             } catch (e) {
                 console.error("SimpleQuest: Condition Parse Error for " + t.id, e);
             }
         }
-
+        // --- [修改结束] ---
         CONFIG.templates[t.id] = {
             id: t.id,
             typeId: t.typeId,
             title: t.title,
             maxProgress: Number(t.maxProgress || 1),
-            maxRepeat: parseInt(t.maxRepeat || -1), // 新增：最大重复次数
+            maxRepeat: parseInt(t.maxRepeat || -1),
             conditionFunc: _condFunc,
             desc: _desc || "",
             rewardText: t.rewardText,
@@ -805,12 +833,15 @@
             ceSuccess: Number(t.ceSuccess || 0),
             ceFail: Number(t.ceFail || 0),
             ceComplete: Number(t.ceComplete || 0),
-
             onAccept: t.onAccept || "",
             onSuccess: t.onSuccess || "",
             onFail: t.onFail || "",
             onComplete: t.onComplete || "",
-            monitorCode: t.monitorCode || ""
+            
+            // --- [修改开始]：预编译 Monitor Code ---
+            // 这里只存储转换后的字符串，具体生成函数在 getMonitorFunc 中进行
+            monitorCode: compileCondition(t.monitorCode || "") 
+            // --- [修改结束] ---
         };
     }
 
@@ -1222,22 +1253,24 @@
     // 2. 存档数据扩展 (Game_System)
     // ======================================================================
 
-    // 缓存容器，不要存入存档(prototype里定义即可)，或者在initialize里定义为不可枚举
-    // 这里我们选择在运行时动态生成
+    // 缓存容器
     const _monitorFuncCache = {};
     function getMonitorFunc(templateId) {
         if (_monitorFuncCache[templateId]) return _monitorFuncCache[templateId];
         
         const tpl = CONFIG.templates[templateId];
-        if (!tpl || !tpl.monitorCode) return null;
+        if (!tpl || !tpl.monitorCode) return null; // 注意：此时 monitorCode 已经是转换后的 JS 代码
+        
         try {
-            // new Function 构建函数
-            const f = new Function("quest", "return " + tpl.monitorCode); // 此时 monitorCode 应该是一个表达式或函数体
-            // 如果用户写的是 "return 1", 则 new Function 变成 function(quest){ return 1 }
-            // 如果用户忘记写 return，如 "$gameParty.gold()", 我们最好容错一下，或者明确告之用户必须写 return
-            // 建议：直接 new Function("return (" + code + ")"); 不太好，因为多行代码可能包含逻辑。
-            // 采用 new Function("quest", code); 用户必须写 return。
-            const func = new Function("quest", tpl.monitorCode);
+            // 为了支持简写（如直接写 "V1" 而不写 return），我们尝试智能判断
+            let codeBody = tpl.monitorCode.trim();
+            
+            // 如果代码里包含 return，说明用户写了完整逻辑，直接用
+            // 如果没有 return，且代码仅仅是一个变量或简单表达式，我们帮他补上 return
+            if (codeBody.indexOf('return') === -1) {
+                codeBody = "return " + codeBody + ";";
+            }
+            const func = new Function("quest", codeBody);
             _monitorFuncCache[templateId] = func;
             return func;
         } catch (e) {
