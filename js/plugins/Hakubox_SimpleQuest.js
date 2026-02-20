@@ -1561,9 +1561,11 @@
 
                 const visibleItems = group.items.filter(q => {
                     const tpl = CONFIG.templates[q.templateId];
-                    if (tpl && tpl.conditionFunc) {
-                        try { return tpl.conditionFunc.call(window); } 
-                        catch (e) { return true; }
+                    if (tpl) {
+                        if (tpl.conditionFunc) {
+                            try { return tpl.conditionFunc.call(window); } 
+                            catch (e) { return true; }
+                        }
                     }
                     return true;
                 });
