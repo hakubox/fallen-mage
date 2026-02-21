@@ -1861,6 +1861,41 @@ class ColorDelta {
     return;
   };
 
+  // --- [新增/修改] 条件编译器：将字符串预编译为函数 ---
+  const createLabelConditionFunc = (condStr, gameEvent) => {
+    // 如果没有条件，返回 null，表示始终显示
+    if (!condStr || condStr.trim() === "") return null;
+    try {
+      // 1. 语法转换：将简写转换为 JS 代码
+      // 注意：先替换操作符，再替换变量，避免干扰
+
+      // 替换 ( ) 以外的逻辑符
+      let script = condStr
+        .replace(/(?<!&)&(?!&)/g, ' && ')
+        .replace(/(?<!\|)\|(?!\|)/g, ' || ')
+        .replace(/=/g, '==='); // 简单的等号容错
+
+      // 替换 V10 -> !!$gameVariables.value(10) (强制转布尔)
+      script = script.replace(/\bV(\d+)\b/gi, (_, id) => {
+        return `$gameVariables.value(${id})`;
+      });
+      // 替换 S10 -> $gameSwitches.value(10)
+      script = script.replace(/\bS(\d+)\b/gi, (_, id) => {
+        return `$gameSwitches.value(${id})`;
+      });
+      // 替换 A-D -> 独立开关判断
+      script = script.replace(/\b([A-D])\b/g, (_, key) => {
+        // 使用 this._mapId 和 this._eventId
+        return `$gameSelfSwitches.value([${gameEvent._mapId}, ${gameEvent._eventId}, "${key.toUpperCase()}"])`;
+      });
+      // 构造函数
+      return new Function("return " + script);
+    } catch (e) {
+      console.warn(`[MapLabel] Compile Error: "${condStr}"`, e);
+      return function () { return false; };
+    }
+  };
+
   /**
   * Tests the value at the specified index of the $gameTemp object for equality with the
   * passed in value and sets it. Returns true if the values match, or false otherwise.
@@ -1894,38 +1929,44 @@ class ColorDelta {
     return result || "";
   };
   Game_Event.prototype.initLightData = function () {   // Event note tag caching
-    this._cl = {};
+    this._cl = this._cl || {};
     this._cl.lastLightPage = this._pageIndex;
 
     let rawTagData = this.getCLTag(); // 获取原始大小写的字符串
+    let condStr = null;
 
-    // 1. 先处理逻辑条件 (假设逻辑条件里包含 &, |, !, >, <, =)
-    // 或者我们规定逻辑条件必须放在标签的最末尾，且通过特殊字符识别，或者我们简单地先尝试解析为逻辑
-    let conditionFunc = null;
+    const condCheckRegex = /\{([^\}#]*?)\}/;
+    const match = rawTagData.match(condCheckRegex);
 
-    // 简单的策略：如果大括号里包含 &, |, !, <, >, =, V, S (且后面跟数字) 或者单独的 A-D，则认为是条件
-    // 为了防止误判颜色循环 {#fff ...}，我们先看是否包含 '#''
-    // 这里使用一个正则来查找可能的逻辑块。
-    // 这是一个权宜之计：匹配 { 非#号开头的内容 }
-    // 更好的方式：你在需求里写的例子是 { !A&!B }。
-
-    let tempTagData = rawTagData;
-    const condCheckRegex = /\{([^\}#]*?)\}/g; // 匹配不含 # 号的大括号内容
-    let match;
-    while ((match = condCheckRegex.exec(tempTagData)) !== null) {
-      let str = match[1];
-      // 简单的特征检测：如果有 V数字, S数字, A-D, !, &, |
-      if (str.match(/[VS]\d+|[A-D]|!|&|\|/i)) {
-        conditionFunc = createLightConditionFunc(str, this);
-        // 从原始字符串中通过替换为空格来移除，供后续处理转小写
-        rawTagData = rawTagData.replace(match[0], " ");
-        break; // 只支持一个条件块
+    if (match) {
+      condStr = match[1];
+      // 只有当内容看起来像逻辑表达式时才认为是条件 (含 V, S, A-D, !, &, |, <, >, =)
+      if (condStr.match(/[VS]\d+|[A-D]|!|&|\||<|>|=/i)) {
+        // 找到了条件字符串，暂存起来
+        // 注意：这里我们不再修改 rawTagData，让后面的解析逻辑正常跑
+        // 原插件的 cycle 解析逻辑比较脆弱，我们尽量不去破坏它原本对 {} 的处理
+        // 只要我们的条件字符串里没有 #ffffff 这种颜色代码，原插件的 parseProps 应该会忽略掉未知的字符
+      } else {
+        condStr = null; // 可能是颜色循环，忽略
       }
     }
 
-    this._cl.conditionFunc = conditionFunc;
-    this._cl.conditionState = true;
-    this._cl.conditionTimer = Math.floor(Math.random() * 15);
+    // 2. 编译并绑定函数 (这一步最重要，读档后需要执行)
+    // 放在这里确保每次 initLightData 都会重新生成函数
+    // createLabelConditionFunc 是我们在上一轮回复里定义的那个编译器函数
+    if (typeof createLabelConditionFunc !== 'function') {
+      // 防止有人忘了贴编译器函数，这里定义一个临时的（或确保你在插件头部定义了它）
+      console.error("Lighting Plugin: createLabelConditionFunc not found!");
+    } else {
+      this._cl.conditionFunc = createLabelConditionFunc(condStr, this);
+    }
+
+    // 初始化计时器（用于分散每帧的计算压力）
+    if (this._cl.conditionTimer === undefined) {
+      this._cl.conditionTimer = Math.floor(Math.random() * 15);
+    }
+    this._cl.conditionState = true; // 默认开启
+
     // 2. 转小写供原插件逻辑通用处理
     let tagData = rawTagData.toLowerCase();
 
@@ -2034,32 +2075,31 @@ class ColorDelta {
     }
   };
   Game_Event.prototype.getLightEnabled = function () {
-    // --- [新增] 条件判断逻辑 ---
-    if (this._cl.conditionFunc) {
-      // 每 15 帧更新一次，分散负载
-      if ((Graphics.frameCount + this._cl.conditionTimer) % 15 === 0) {
+    // 只有当有条件函数时才进行计算
+    if (this._cl && this._cl.conditionFunc) {
+      // 使用缓存的 timer，每 15 帧计算一次
+      const now = Graphics.frameCount;
+      const timer = this._cl.conditionTimer || 0;
+
+      if ((now + timer) % 15 === 0) {
         try {
+          // 执行编译好的函数
           this._cl.conditionState = !!this._cl.conditionFunc.call(this);
         } catch (e) {
-          // 运行时出错（例如变量不复存在），保持上次状态或关闭
           this._cl.conditionState = false;
         }
       }
-      // 如果条件为假，直接返回 false，不看后面的逻辑
-      if (!this._cl.conditionState) return false;
+      // 如果条件不满足，直接返回 false（灯光关闭）
+      if (this._cl.conditionState === false) {
+        return false;
+      }
     }
-    // --- [新增结束] ---
     if (!this._cl.switch) return this._cl.delta ? this._cl.delta.current.enable : this._cl.enable;
     return (this._cl.switch.equalsIC("night") && $$.isNight()) ||
       (this._cl.switch.equalsIC("day") && !$$.isNight());
   };
   Game_Event.prototype.conditionalLightingNext = function () {
     if (this.getLightCycle() || this.getLightId()) this._cl.delta.next();
-  };
-  Game_Event.prototype.getLightEnabled = function () {
-    if (!this._cl.switch) return this._cl.delta ? this._cl.delta.current.enable : this._cl.enable;
-    return (this._cl.switch.equalsIC("night") && $$.isNight()) ||
-      (this._cl.switch.equalsIC("day") && !$$.isNight());
   };
   Game_Event.prototype.getLightType = function () { return this._cl.type; };
   Game_Event.prototype.getLightXRadius = function () { return this._cl.delta ? this._cl.delta.current.xRadius : this._cl.xRadius; };
@@ -2484,7 +2524,7 @@ class ColorDelta {
         continue;
       }
 
-      if (cur._cl == null) {
+      if (cur._cl == null || (cur._cl.conditionFunc === undefined)) {
         cur.initLightData();
         $gameVariables._cl[evid] = cur._cl; // store the current light data in gamevars so it gets saved
       }

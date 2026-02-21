@@ -1376,6 +1376,7 @@
         if (includeHidden) {
             return this._questInstances;
         }
+        if (!this._questInstances) return [];
         // 否则进行过滤：筛除掉那些 conditionFunc 返回 false 的任务
         return this._questInstances.filter(q => {
             const tpl = CONFIG.templates[q.templateId];

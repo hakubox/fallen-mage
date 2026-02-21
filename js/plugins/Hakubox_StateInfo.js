@@ -210,7 +210,7 @@
     class TextParser {
         static process(text) {
             if (!text) return "";
-            
+
             // 1. Process Variable: {V123}
             text = text.replace(/\{V(\d+)\}/gi, (_, id) => {
                 return $gameVariables.value(Number(id));
@@ -262,13 +262,23 @@
             this._timer = 0;
             this._targetOpacity = 255;
             this.contentsOpacity = 255; // Independent content opacity
-            
+
             // Remove standard window background if opacity is 0 for cleaner look
             if (this.opacity === 0) {
                 this.frameVisible = false;
             }
-            
+
+            // 预加载所有可能用到的图片，防止第一次显示闪烁
+            this.preloadImages();
+
             this.refresh();
+        }
+
+        preloadImages() {
+            // 这里只是简单的请求一次加载，确保图片进入缓存
+            // MZ的ImageManager会自动处理缓存
+            const list = ["bg_0", "bg_1", "bg_2", "bg_3", "day_1", "day_2", "day_3", "day_4", "day_5", "day_en-US", "day_ja-JP", "day_zh-CN", "fg_en-US", "fg_ja-JP", "fg_zh-CN", "night_en-US", "night_ja-JP", "night_zh-CN"];
+            list.forEach(name => ImageManager.loadPicture('status/' + name));
         }
 
         update() {
@@ -299,12 +309,8 @@
 
             // 2. Player Occlusion Check
             if (config.fadeOnHover && !shouldFade) {
-                // Convert Map coords to Screen coords to check overlap
                 const pX = $gamePlayer.screenX();
                 const pY = $gamePlayer.screenY();
-                // Simple box collision
-                // Window coords are top-left based. Player screenY is bottom-center based usually.
-                // We add some buffer.
                 if (pX >= this.x && pX <= this.x + this.width &&
                     pY >= this.y && pY <= this.y + this.height + 48) {
                     shouldFade = true;
@@ -329,32 +335,99 @@
             } else if (this.contentsOpacity < this._targetOpacity) {
                 this.contentsOpacity = Math.min(this.contentsOpacity + config.fadeSpeed, this._targetOpacity);
             }
-            
-            // If window frame is visible, fade it too
+
             if (this.opacity > 0) {
-                 // Scale frame opacity relative to content logic roughly
-                 // Or keep it simple, just fade contents mostly.
-                 // Here we sync them if frame is used.
-                 this.opacity = (this.contentsOpacity / 255) * config.winOpacity;
+                this.opacity = (this.contentsOpacity / 255) * config.winOpacity;
             }
         }
 
         updateContent() {
             this._timer++;
+            // 稍微提高一下刷新监测频率，或者每帧都监测变量变化
             if (this._timer < config.refreshRate) return;
             this._timer = 0;
-            
-            // Redraw
-            // Optimization: In a super heavy game, we might check if values changed first.
-            // But for a HUD with < 20 elements, clearing and redrawing every 15 frames is negligible in MZ (PixiJS).
+
+            // 为了确保存档读取后图片能显示，最好调用refresh
             this.refresh();
         }
+
+        // --- 核心修改：新增硬编码绘图逻辑 ---
+        drawCustomHStatus() {
+            // 1. 获取数据
+            const dayCount = $gameVariables.value(5); // 变量5: 天数
+            const isNight = $gameSwitches.value(6);   // 开关6: 昼夜 (假设开=夜，关=昼，根据实际情况调整)
+            const lustLevel = $gameVariables.value(8); // 变量8: 淫乱度
+
+            // 获取语言，如果 TranslateUtils 不存在则给个默认值
+            let lang = "zh-CN";
+            if (typeof TranslateUtils !== 'undefined' && TranslateUtils.currentLanguage) {
+                lang = TranslateUtils.currentLanguage;
+            } else {
+                // 如果没有语言插件，尝试检测系统语言或默认
+                if ($dataSystem.locale) lang = $dataSystem.locale;
+            }
+
+            // 防御性编程：根据你提供的文件名，语言代码必须完全匹配 (zh-CN, en-US, ja-JP)
+            // 如果你的游戏里语言代码是 'cn' 或 'en'，这里可能需要转换一下
+            // 假设你的 TranslateUtils 返回的就是 'zh-CN' 这种格式。
+
+            // 2. 确定文件名
+
+            // A. 背景图 (bg_0.png ~ bg_3.png)
+            // 限制 lustLevel 在 0-3 之间，防止报错
+            const safeLust = Math.max(0, Math.min(3, lustLevel));
+            const bgName = `bg_${safeLust}`;
+
+            // B. 天数数字 (day_1.png ~ day_5.png)
+            const safeDay = Math.max(1, Math.min(5, dayCount));
+            const dayNumName = `day_${safeDay}`; // 用于显示 "1", "2"...
+
+            // C. 昼夜图标 (day_zh-CN.png 或 night_zh-CN.png)
+            const timePrefix = isNight ? "night" : "day";
+            const timeIconName = `${timePrefix}_${lang}`;
+
+            // D. 前景文字 (fg_zh-CN.png) - 也就是 "日数: ... 淫乱度: ..." 这些固定文本
+            const fgName = `fg_${lang}`;
+
+            // 3. 执行绘制
+            // 注意：drawImage 自带缓存检查，如果图片没加载好不会报错但也不会显示
+            // 建议所有图片放在 img/pictures/ 文件夹下
+
+            // 绘制顺序：背景 -> 前景文字 -> 昼夜图标 -> 天数数字
+            // 这里的 (0, 0) 是相对于 HUD 窗口的坐标。
+
+            this.drawPicture(bgName, 0, 0);       // 背景（那个带着心的紫发框）
+            this.drawPicture(fgName, 0, 0);       // 文字层（Day:, Lust:）
+            this.drawPicture(timeIconName, 0, 0); // 太阳或月亮图标
+            this.drawPicture(dayNumName, 0, 0);   // 天数数字
+        }
+
+        drawPicture(filename, x, y) {
+            const bitmap = ImageManager.loadPicture('status/' + filename);
+            if (bitmap.isReady()) {
+                // 将图片完整绘制到窗口内容层
+                this.contents.blt(bitmap, 0, 0, bitmap.width, bitmap.height, x, y);
+            } else {
+                // 如果第一次没加载好，加个简单的回调重绘
+                bitmap.addLoadListener(() => {
+                    // 只在窗口还没销毁时重绘
+                    if (this.contents) {
+                        this.contents.blt(bitmap, 0, 0, bitmap.width, bitmap.height, x, y);
+                    }
+                });
+            }
+        }
+        // ----------------------------------------
 
         refresh() {
             this.contents.clear();
 
+            // 1. 先执行你的硬编码定制显示
+            this.drawCustomHStatus();
+
+            // 2. 再执行原有的配置项显示 (如果你的Elements List里还有东西的话，会叠加在上面)
+            // 如果你只想要硬编码的图，可以在插件参数里把 Elements List 清空
             for (const elem of this._elements) {
-                // Check JS Condition
                 if (!TextParser.evalCondition(elem['Visible Condition'])) continue;
 
                 const processedText = TextParser.process(elem['Content']);
@@ -364,16 +437,13 @@
                 let textColor = elem['Text Color'];
                 const outlineColor = elem['Outline Color'];
 
-                // Setup Font
                 this.contents.fontSize = fontSize;
-                
-                // Handle Color
+
                 if (textColor) {
-                    // Check if it's a number (System Color) or Hex
                     if (!isNaN(parseInt(textColor)) && textColor.indexOf('#') === -1) {
-                         this.changeTextColor(ColorManager.textColor(Number(textColor)));
+                        this.changeTextColor(ColorManager.textColor(Number(textColor)));
                     } else {
-                         this.changeTextColor(textColor);
+                        this.changeTextColor(textColor);
                     }
                 } else {
                     this.resetTextColor();
@@ -383,11 +453,7 @@
                     this.contents.outlineColor = outlineColor;
                 }
 
-                // Draw
-                // We use drawTextEx to support icons (\I[n]) and colors (\C[n])
                 this.drawTextEx(processedText, x, y, this.contentsWidth());
-                
-                // Reset defaults for next item
                 this.resetFontSettings();
             }
         }
@@ -398,12 +464,12 @@
     // ============================================================================
 
     const _Scene_Map_createAllWindows = Scene_Map.prototype.createAllWindows;
-    Scene_Map.prototype.createAllWindows = function() {
+    Scene_Map.prototype.createAllWindows = function () {
         _Scene_Map_createAllWindows.call(this);
         this.createCustomHUD();
     };
 
-    Scene_Map.prototype.createCustomHUD = function() {
+    Scene_Map.prototype.createCustomHUD = function () {
         const rect = new Rectangle(config.x, config.y, config.width, config.height);
         this._customHudWindow = new Window_CustomHUD(rect);
         this.addWindow(this._customHudWindow);
