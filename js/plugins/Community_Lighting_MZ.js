@@ -20,7 +20,7 @@ if (typeof require !== "undefined" && typeof module != "undefined") {
   var { Window_Selectable, Window_Options } = require("../rmmz_windows");
   var { Spriteset_Map, Spriteset_Battle } = require("../rmmz_sprites");
   var { Scene_Map } = require("../rmmz_scenes");
-  var { Bitmap, Tilemap} = require("../rmmz_core");
+  var { Bitmap, Tilemap } = require("../rmmz_core");
 }
 var Community = Community || {};
 Community.Lighting = Community.Lighting || {};
@@ -938,16 +938,16 @@ Imported[Community.Lighting.name] = true;
 */
 
 
-const M_2PI    = 2 * Math.PI;   // cache 2PI - this is faster
+const M_2PI = 2 * Math.PI;   // cache 2PI - this is faster
 const M_PI_180 = Math.PI / 180; // cache PI/180 - this is faster
 
-Number.prototype.is           = function(...a)     { return a.includes(Number(this)); };
-Number.prototype.inRange      = function(min, max) { return this >= min && this <= max; };
-Number.prototype.clone        = function()         { return Number(this); };
-Boolean.prototype.clone       = function()         { return this == true; };
-String.prototype.equalsIC     = function(...a)     { return a.map(s => s.toLowerCase()).includes(this.toLowerCase()); };
-String.prototype.startsWithIC = function(s)        { return this.toLowerCase().startsWith(s.toLowerCase()); };
-Math.minmax                   = (minOrMax, ...a) =>  minOrMax ? Math.min(...a) : Math.max(...a); // min if positive
+Number.prototype.is = function (...a) { return a.includes(Number(this)); };
+Number.prototype.inRange = function (min, max) { return this >= min && this <= max; };
+Number.prototype.clone = function () { return Number(this); };
+Boolean.prototype.clone = function () { return this == true; };
+String.prototype.equalsIC = function (...a) { return a.map(s => s.toLowerCase()).includes(this.toLowerCase()); };
+String.prototype.startsWithIC = function (s) { return this.toLowerCase().startsWith(s.toLowerCase()); };
+Math.minmax = (minOrMax, ...a) => minOrMax ? Math.min(...a) : Math.max(...a); // min if positive
 
 let isRMMZ = () => Utils.RPGMAKER_NAME === "MZ";
 let isRMMV = () => Utils.RPGMAKER_NAME === "MV";
@@ -962,11 +962,11 @@ function orBoolean(...a) {
   }
 }
 function orNullish(...a) { for (let i = 0; i < a.length; i++) if (a[i] != null) return a[i]; }
-function orNaN(...a)     { for (let i = 0; i < a.length; i++) if (!isNaN(a[i])) return a[i]; }
+function orNaN(...a) { for (let i = 0; i < a.length; i++) if (!isNaN(a[i])) return a[i]; }
 
-let isOn         = (x) => x.toLowerCase() === "on";
-let isOff        = (x) => x.toLowerCase() === "off";
-let isActivate   = (x) => x.toLowerCase() === "activate";
+let isOn = (x) => x.toLowerCase() === "on";
+let isOff = (x) => x.toLowerCase() === "off";
+let isActivate = (x) => x.toLowerCase() === "activate";
 let isDeactivate = (x) => x.toLowerCase() === "deactivate";
 
 // Map community light directions to polar angles (360 degrees)
@@ -992,53 +992,53 @@ const RMDirectionMap = {
 
 const TileType = {
   Terrain: 1, terrain: 1, 1: 1,
-  Region:  2, region:  2, 2: 2
+  Region: 2, region: 2, 2: 2
 };
 
 const LightType = {
-  Light     : 1, light     : 1, 1: 1,
-  Fire      : 2, fire      : 2, 2: 2,
+  Light: 1, light: 1, 1: 1,
+  Fire: 2, fire: 2, 2: 2,
   Flashlight: 3, flashlight: 3, 3: 3,
-  Glow      : 4, glow      : 4, 4: 4
+  Glow: 4, glow: 4, 4: 4
 };
 
 const TileLightType = {
-  tilelight:   [TileType.Terrain, LightType.Light],
-  tilefire:    [TileType.Terrain, LightType.Fire],
-  tileglow:    [TileType.Terrain, LightType.Glow],
-  regionlight: [TileType.Region,  LightType.Light],
-  regionfire:  [TileType.Region,  LightType.Fire],
-  regionglow:  [TileType.Region,  LightType.Glow],
+  tilelight: [TileType.Terrain, LightType.Light],
+  tilefire: [TileType.Terrain, LightType.Fire],
+  tileglow: [TileType.Terrain, LightType.Glow],
+  regionlight: [TileType.Region, LightType.Light],
+  regionfire: [TileType.Region, LightType.Fire],
+  regionglow: [TileType.Region, LightType.Glow],
 };
 
 const TileBlockType = {
-  tileblock:   TileType.Terrain,
+  tileblock: TileType.Terrain,
   regionblock: TileType.Region
 };
 
 class TileLight {
   constructor(tileType, lightType, id, onoff, color, radius, brightness) {
-    this.tileType   = TileType[tileType];
-    this.lightType  = LightType[lightType];
-    this.id         = +id || 0;
-    this.enabled    = isOn(onoff);
-    this.color      = new VRGBA(color);
-    this.radius     = +radius || 0;
+    this.tileType = TileType[tileType];
+    this.lightType = LightType[lightType];
+    this.id = +id || 0;
+    this.enabled = isOn(onoff);
+    this.color = new VRGBA(color);
+    this.radius = +radius || 0;
     this.brightness = brightness && (brightness.slice(1, brightness.length) / 100).clamp(0, 1) ||
-                      Community.Lighting.defaultBrightness || 0;
+      Community.Lighting.defaultBrightness || 0;
   }
 }
 
 class TileBlock {
   constructor(tileType, id, onoff, color, shape, xOffset, yOffset, blockWidth, blockHeight) {
-    this.tileType    = TileType[tileType];
-    this.id          = +id || 0;
-    this.enabled     = isOn(onoff);
-    this.color       = new VRGBA(color);
-    this.shape       = +shape || 0;
-    this.xOffset     = +xOffset || 0;
-    this.yOffset     = +yOffset || 0;
-    this.blockWidth  = +blockWidth || 0;
+    this.tileType = TileType[tileType];
+    this.id = +id || 0;
+    this.enabled = isOn(onoff);
+    this.color = new VRGBA(color);
+    this.shape = +shape || 0;
+    this.xOffset = +xOffset || 0;
+    this.yOffset = +yOffset || 0;
+    this.blockWidth = +blockWidth || 0;
     this.blockHeight = +blockHeight || 0;
   }
 }
@@ -1077,8 +1077,8 @@ class VRGBA {
     this.name = VRGBA.name;
     if (arguments.length == 0) return;                           // return if no arguments (allows construction).
     else if (typeof vOrHex === "boolean")                        // Passed v, r, g, b, a
-      [this.v, this.r,           this.g,  this.b,  this.a] =     // - assign
-      [vOrHex, +rOrDefault || 0, +g || 0, +b || 0, +a || 0xff];  // -
+      [this.v, this.r, this.g, this.b, this.a] =     // - assign
+        [vOrHex, +rOrDefault || 0, +g || 0, +b || 0, +a || 0xff];  // -
     else if (vOrHex == null || typeof vOrHex === "string") {     // passed a hex String or nullish
       vOrHex = this.normalizeHex(vOrHex, rOrDefault);            //  - parse hex
       this.v = vOrHex.startsWithIC("a#");                        //  - assign v
@@ -1210,25 +1210,25 @@ class LightProperties {
     this.name = LightProperties.name;
     // Always define in case durations aren't passed to targets
     this.transitionDuration = 0;
-    this.pauseDuration      = 0;
-    this.updateFrame        = 0;
+    this.pauseDuration = 0;
+    this.updateFrame = 0;
     if (arguments.length == 0) return;
     // shared properties
-    this.type       = type;
-    this.color      = color;
-    this.enable     = enable;
+    this.type = type;
+    this.color = color;
+    this.enable = enable;
     this.brightness = brightness;
-    this.xOffset    = xOffset;
-    this.yOffset    = yOffset;
+    this.xOffset = xOffset;
+    this.yOffset = yOffset;
     // light type dependent properties
     let isOL = this.isOtherLight();
     let isFL = this.isFlashlight();
-    if (isOL) this.xRadius    = xRadius;
-    if (isOL) this.yRadius    = yRadius;
-    if (isFL) this.clockwise  = true;
-    if (isFL) this.direction  = direction;
+    if (isOL) this.xRadius = xRadius;
+    if (isOL) this.yRadius = yRadius;
+    if (isFL) this.clockwise = true;
+    if (isFL) this.direction = direction;
     if (isFL) this.beamLength = beamLength;
-    if (isFL) this.beamWidth  = beamWidth;
+    if (isFL) this.beamWidth = beamWidth;
   }
 
   /**
@@ -1252,22 +1252,22 @@ class LightProperties {
     // properties with no suffix 'clear' the target
     properties.forEach((e) => {
       // clear checks (back to initial value for the given property)
-      if      (        e.equalsIC('t'))  { this.transitionDuration = 0; return; }
-      else if (        e.equalsIC('p'))  { this.pauseDuration      = 0; return; }
-      else if (        e.equalsIC('#'))  { this.color      = void (0); return; }
-      else if (        e.equalsIC('a#')) { this.color      = void (0); return; }
-      else if (        e.equalsIC('e'))  { this.enable     = void (0); return; }
-      else if (        e.equalsIC('b'))  { this.brightness = void (0); return; }
-      else if (isOL && e.equalsIC('r'))  { this.xRadius    = void (0); return; }
-      else if (isOL && e.equalsIC('xr')) { this.xRadius    = void (0); return; }
-      else if (isOL && e.equalsIC('yr')) { this.yRadius    = void (0); return; }
-      else if (        e.equalsIC('x'))  { this.xOffset    = void (0); return; }
-      else if (        e.equalsIC('y'))  { this.yOffset    = void (0); return; }
-      else if (isFL && e.equalsIC('l'))  { this.beamLength = void (0); return; }
-      else if (isFL && e.equalsIC('w'))  { this.beamWidth  = void (0); return; }
-      else if (isFL && e.equalsIC('a'))  { this.clockwise  = this.direction = void (0); return; }
-      else if (isFL && e.equalsIC('+a')) { this.clockwise  = this.direction = void (0); return; }
-      else if (isFL && e.equalsIC('-a')) { this.clockwise  = this.direction = void (0); return; }
+      if (e.equalsIC('t')) { this.transitionDuration = 0; return; }
+      else if (e.equalsIC('p')) { this.pauseDuration = 0; return; }
+      else if (e.equalsIC('#')) { this.color = void (0); return; }
+      else if (e.equalsIC('a#')) { this.color = void (0); return; }
+      else if (e.equalsIC('e')) { this.enable = void (0); return; }
+      else if (e.equalsIC('b')) { this.brightness = void (0); return; }
+      else if (isOL && e.equalsIC('r')) { this.xRadius = void (0); return; }
+      else if (isOL && e.equalsIC('xr')) { this.xRadius = void (0); return; }
+      else if (isOL && e.equalsIC('yr')) { this.yRadius = void (0); return; }
+      else if (e.equalsIC('x')) { this.xOffset = void (0); return; }
+      else if (e.equalsIC('y')) { this.yOffset = void (0); return; }
+      else if (isFL && e.equalsIC('l')) { this.beamLength = void (0); return; }
+      else if (isFL && e.equalsIC('w')) { this.beamWidth = void (0); return; }
+      else if (isFL && e.equalsIC('a')) { this.clockwise = this.direction = void (0); return; }
+      else if (isFL && e.equalsIC('+a')) { this.clockwise = this.direction = void (0); return; }
+      else if (isFL && e.equalsIC('-a')) { this.clockwise = this.direction = void (0); return; }
 
       // parse suffix (individual & random ranges)
       let suffix, rand = (min, max) => Math.random() * (max - min) + min;
@@ -1285,27 +1285,27 @@ class LightProperties {
         let min = new VRGBA(eSplit[0]);                                         // - get the whole hex value
         let max = new VRGBA(eSplit[1]);                                         // - get the whole hex value
         suffix = new VRGBA(Boolean(Math.floor(rand(min.v, max.v + 1))), Math.floor(rand(min.r, max.r + 1)),
-                                   Math.floor(rand(min.g, max.g + 1)),  Math.floor(rand(min.b, max.b + 1)),
-                                   Math.floor(rand(min.a, max.a + 1)));
+          Math.floor(rand(min.g, max.g + 1)), Math.floor(rand(min.b, max.b + 1)),
+          Math.floor(rand(min.a, max.a + 1)));
       }
 
       // prefix checks
-      if (             e.startsWithIC('t'))    this.transitionDuration = suffix;
-      else if (        e.startsWithIC('p'))    this.pauseDuration      = suffix;
-      else if (        e.startsWithIC('#'))    this.color      = suffix;
-      else if (        e.startsWithIC('a#'))   this.color      = suffix;
-      else if (        e.startsWithIC('e'))    this.enable     = Boolean(suffix);
-      else if (        e.startsWithIC('b'))    this.brightness = (suffix / 100).clamp(0, 1);
-      else if (isOL && e.startsWithIC('r'))    this.xRadius    = suffix;
-      else if (isOL && e.startsWithIC('xr'))   this.xRadius    = suffix;
-      else if (isOL && e.startsWithIC('yr'))   this.yRadius    = suffix;
-      else if (        e.startsWithIC('x'))    this.xOffset    = suffix;
-      else if (        e.startsWithIC('y'))    this.yOffset    = suffix;
-      else if (isFL && e.startsWithIC('l'))    this.beamLength = suffix;
-      else if (isFL && e.startsWithIC('w'))    this.beamWidth  = suffix;
-      else if (isFL && e.startsWithIC('a'))  { this.clockwise  = true;  this.direction = M_PI_180 * suffix; }
-      else if (isFL && e.startsWithIC('+a')) { this.clockwise  = true;  this.direction = M_PI_180 * suffix; }
-      else if (isFL && e.startsWithIC('-a')) { this.clockwise  = false; this.direction = M_PI_180 * suffix; }
+      if (e.startsWithIC('t')) this.transitionDuration = suffix;
+      else if (e.startsWithIC('p')) this.pauseDuration = suffix;
+      else if (e.startsWithIC('#')) this.color = suffix;
+      else if (e.startsWithIC('a#')) this.color = suffix;
+      else if (e.startsWithIC('e')) this.enable = Boolean(suffix);
+      else if (e.startsWithIC('b')) this.brightness = (suffix / 100).clamp(0, 1);
+      else if (isOL && e.startsWithIC('r')) this.xRadius = suffix;
+      else if (isOL && e.startsWithIC('xr')) this.xRadius = suffix;
+      else if (isOL && e.startsWithIC('yr')) this.yRadius = suffix;
+      else if (e.startsWithIC('x')) this.xOffset = suffix;
+      else if (e.startsWithIC('y')) this.yOffset = suffix;
+      else if (isFL && e.startsWithIC('l')) this.beamLength = suffix;
+      else if (isFL && e.startsWithIC('w')) this.beamWidth = suffix;
+      else if (isFL && e.startsWithIC('a')) { this.clockwise = true; this.direction = M_PI_180 * suffix; }
+      else if (isFL && e.startsWithIC('+a')) { this.clockwise = true; this.direction = M_PI_180 * suffix; }
+      else if (isFL && e.startsWithIC('-a')) { this.clockwise = false; this.direction = M_PI_180 * suffix; }
     }, this);
   }
 
@@ -1316,20 +1316,20 @@ class LightProperties {
   clone() {
     let that = new LightProperties();
     if (this.transitionDuration != null) that.transitionDuration = this.transitionDuration;
-    if (this.pauseDuration      != null) that.pauseDuration      = this.pauseDuration;
-    if (this.updateFrame        != null) that.updateFrame        = this.updateFrame;
-    if (this.type               != null) that.type               = this.type;
-    if (this.enable             != null) that.enable             = this.enable;
-    if (this.color              != null) that.color              = this.color     .clone();
-    if (this.brightness         != null) that.brightness         = this.brightness.clone();
-    if (this.xOffset            != null) that.xOffset            = this.xOffset   .clone();
-    if (this.yOffset            != null) that.yOffset            = this.yOffset   .clone();
-    if (this.xRadius            != null) that.xRadius            = this.xRadius   .clone();
-    if (this.yRadius            != null) that.yRadius            = this.yRadius   .clone();
-    if (this.clockwise          != null) that.clockwise          = this.clockwise .clone();
-    if (this.beamLength         != null) that.beamLength         = this.beamLength.clone();
-    if (this.beamWidth          != null) that.beamWidth          = this.beamWidth .clone();
-    if (this.direction          != null) that.direction          = this.direction .clone();
+    if (this.pauseDuration != null) that.pauseDuration = this.pauseDuration;
+    if (this.updateFrame != null) that.updateFrame = this.updateFrame;
+    if (this.type != null) that.type = this.type;
+    if (this.enable != null) that.enable = this.enable;
+    if (this.color != null) that.color = this.color.clone();
+    if (this.brightness != null) that.brightness = this.brightness.clone();
+    if (this.xOffset != null) that.xOffset = this.xOffset.clone();
+    if (this.yOffset != null) that.yOffset = this.yOffset.clone();
+    if (this.xRadius != null) that.xRadius = this.xRadius.clone();
+    if (this.yRadius != null) that.yRadius = this.yRadius.clone();
+    if (this.clockwise != null) that.clockwise = this.clockwise.clone();
+    if (this.beamLength != null) that.beamLength = this.beamLength.clone();
+    if (this.beamWidth != null) that.beamWidth = this.beamWidth.clone();
+    if (this.direction != null) that.direction = this.direction.clone();
     return that;
   }
 }
@@ -1347,32 +1347,32 @@ class LightDelta {
   constructor(current, target, defaults, fade = true) {
     this.name = LightDelta.name;
     if (arguments.length == 0) return;
-    this.current  = current;
-    this.target   = target;
+    this.current = current;
+    this.target = target;
     this.defaults = { // clone defaults to avoid self-loops (which breaks saving)
-      color      : defaults.color.clone(),
-      brightness : defaults.brightness,
-      xOffset    : defaults.xOffset,
-      yOffset    : defaults.yOffset,
-      xRadius    : defaults.xRadius,
-      yRadius    : defaults.yRadius,
-      beamLength : defaults.beamLength,
-      beamWidth  : defaults.beamWidth,
-      direction  : defaults.direction
+      color: defaults.color.clone(),
+      brightness: defaults.brightness,
+      xOffset: defaults.xOffset,
+      yOffset: defaults.yOffset,
+      xRadius: defaults.xRadius,
+      yRadius: defaults.yRadius,
+      beamLength: defaults.beamLength,
+      beamWidth: defaults.beamWidth,
+      direction: defaults.direction
     };
 
-    this.delta    = new LightProperties();
+    this.delta = new LightProperties();
 
     // Assign currents if non-existent
-    if (this.current.color == null)      this.current.color      = this.defaults.color;
+    if (this.current.color == null) this.current.color = this.defaults.color;
     if (this.current.brightness == null) this.current.brightness = this.defaults.brightness;
-    if (this.current.xOffset == null)    this.current.xOffset    = this.defaults.xOffset;
-    if (this.current.yOffset == null)    this.current.yOffset    = this.defaults.yOffset;
-    if (this.current.xRadius == null)    this.current.xRadius    = this.defaults.xRadius;
-    if (this.current.yRadius == null)    this.current.yRadius    = this.defaults.yRadius;
+    if (this.current.xOffset == null) this.current.xOffset = this.defaults.xOffset;
+    if (this.current.yOffset == null) this.current.yOffset = this.defaults.yOffset;
+    if (this.current.xRadius == null) this.current.xRadius = this.defaults.xRadius;
+    if (this.current.yRadius == null) this.current.yRadius = this.defaults.yRadius;
     if (this.current.beamLength == null) this.current.beamLength = this.defaults.beamLength;
-    if (this.current.beamWidth == null)  this.current.beamWidth  = this.defaults.beamWidth;
-    if (this.current.direction == null)  this.current.direction  = this.defaults.direction;
+    if (this.current.beamWidth == null) this.current.beamWidth = this.defaults.beamWidth;
+    if (this.current.direction == null) this.current.direction = this.defaults.direction;
 
     this.createDeltas(fade);
   }
@@ -1385,8 +1385,8 @@ class LightDelta {
     let that = new LightDelta();
     // clone durations
     if (this.current != null) that.current = this.current.clone();
-    if (this.target  != null) that.target  = this.target.clone();
-    if (this.delta   != null) that.delta   = this.delta.clone();
+    if (this.target != null) that.target = this.target.clone();
+    if (this.delta != null) that.delta = this.delta.clone();
     return that;
   }
 
@@ -1401,15 +1401,15 @@ class LightDelta {
     let normalizeAngle = (rads) => rads % (M_2PI) + (rads < 0) * M_2PI; // normalize between 0 & 2*Pi
     let normalizeClockwiseMovement = () => {
       this.current.direction = normalizeAngle(this.current.direction); // normalize already assigned current
-      target.direction  = normalizeAngle(target.direction);  // convert target to radians before normalization
+      target.direction = normalizeAngle(target.direction);  // convert target to radians before normalization
       if (this.current.direction > target.direction) target.direction += M_2PI; // clockwise normalize
     };
     let normalizeCounterClockwiseMovement = () => {
       this.current.direction = normalizeAngle(this.current.direction); // normalize already assigned current
-      target.direction  = normalizeAngle(target.direction);  // convert target to radians before normalization
+      target.direction = normalizeAngle(target.direction);  // convert target to radians before normalization
       if (this.current.direction < target.direction) target.direction -= M_2PI; // c-clockwise normalize
     };
-    let createColor  = (...a) => !a.some(x => x == null) && ColorDelta.create(...a)  || void (0);
+    let createColor = (...a) => !a.some(x => x == null) && ColorDelta.create(...a) || void (0);
     let createNumber = (...a) => !a.some(x => x == null) && NumberDelta.create(...a) || void (0);
 
     // set delta creation at current frame time
@@ -1424,7 +1424,7 @@ class LightDelta {
 
     // Set current durations or 0 if not fading
     this.current.transitionDuration = fade ? target.transitionDuration : 0;
-    this.current.pauseDuration      = fade ? target.pauseDuration : 0;
+    this.current.pauseDuration = fade ? target.pauseDuration : 0;
 
     // Enable or disable the current immediately based off of target value
     this.current.enable = target.enable != null ? target.enable : this.defaults.enable;
@@ -1434,38 +1434,38 @@ class LightDelta {
       void (target.clockwise ? normalizeClockwiseMovement() : normalizeCounterClockwiseMovement());
 
     // Set any null targets to default (normalization for nulls) (allows defaults to gradually transition)
-    if (target.color == null)              target.color      = this.defaults.color;
-    if (target.brightness == null)         target.brightness = this.defaults.brightness;
-    if (target.xOffset == null)            target.xOffset    = this.defaults.xOffset;
-    if (target.yOffset == null)            target.yOffset    = this.defaults.yOffset;
-    if (isOL && target.xRadius == null)    target.xRadius    = this.defaults.xRadius;
-    if (isOL && target.yRadius == null)    target.yRadius    = this.defaults.yRadius;
+    if (target.color == null) target.color = this.defaults.color;
+    if (target.brightness == null) target.brightness = this.defaults.brightness;
+    if (target.xOffset == null) target.xOffset = this.defaults.xOffset;
+    if (target.yOffset == null) target.yOffset = this.defaults.yOffset;
+    if (isOL && target.xRadius == null) target.xRadius = this.defaults.xRadius;
+    if (isOL && target.yRadius == null) target.yRadius = this.defaults.yRadius;
     if (isFL && target.beamLength == null) target.beamLength = this.defaults.beamLength;
-    if (isFL && target.beamWidth == null)  target.beamWidth  = this.defaults.beamWidth;
-    if (isFL && target.direction == null)  target.direction  = this.defaults.direction;
+    if (isFL && target.beamWidth == null) target.beamWidth = this.defaults.beamWidth;
+    if (isFL && target.direction == null) target.direction = this.defaults.direction;
 
     // assign deltas if current & targets exist (only create deltas if supported by the light type)
-              this.delta.color      = createColor (this.current.color,      target.color,      this.current.transitionDuration);
-              this.delta.color      = createColor (this.current.color,      target.color,      this.current.transitionDuration);
-              this.delta.brightness = createNumber(this.current.brightness, target.brightness, this.current.transitionDuration);
-              this.delta.xOffset    = createNumber(this.current.xOffset,    target.xOffset,    this.current.transitionDuration);
-              this.delta.yOffset    = createNumber(this.current.yOffset,    target.yOffset,    this.current.transitionDuration);
-    if (isOL) this.delta.xRadius    = createNumber(this.current.xRadius,    target.xRadius,    this.current.transitionDuration);
-    if (isOL) this.delta.yRadius    = createNumber(this.current.yRadius,    target.yRadius,    this.current.transitionDuration);
+    this.delta.color = createColor(this.current.color, target.color, this.current.transitionDuration);
+    this.delta.color = createColor(this.current.color, target.color, this.current.transitionDuration);
+    this.delta.brightness = createNumber(this.current.brightness, target.brightness, this.current.transitionDuration);
+    this.delta.xOffset = createNumber(this.current.xOffset, target.xOffset, this.current.transitionDuration);
+    this.delta.yOffset = createNumber(this.current.yOffset, target.yOffset, this.current.transitionDuration);
+    if (isOL) this.delta.xRadius = createNumber(this.current.xRadius, target.xRadius, this.current.transitionDuration);
+    if (isOL) this.delta.yRadius = createNumber(this.current.yRadius, target.yRadius, this.current.transitionDuration);
     if (isFL) this.delta.beamLength = createNumber(this.current.beamLength, target.beamLength, this.current.transitionDuration);
-    if (isFL) this.delta.beamWidth  = createNumber(this.current.beamWidth,  target.beamWidth,  this.current.transitionDuration);
-    if (isFL) this.delta.direction  = createNumber(this.current.direction,  target.direction,  this.current.transitionDuration);
+    if (isFL) this.delta.beamWidth = createNumber(this.current.beamWidth, target.beamWidth, this.current.transitionDuration);
+    if (isFL) this.delta.direction = createNumber(this.current.direction, target.direction, this.current.transitionDuration);
 
     // assign new currents for existing deltas to propagate currents for duration = 0
-    if (this.delta.color != null)      this.current.color      = this.delta.color     .get();
+    if (this.delta.color != null) this.current.color = this.delta.color.get();
     if (this.delta.brightness != null) this.current.brightness = this.delta.brightness.get();
-    if (this.delta.xOffset != null)    this.current.xOffset    = this.delta.xOffset   .get();
-    if (this.delta.yOffset != null)    this.current.yOffset    = this.delta.yOffset   .get();
-    if (this.delta.xRadius !=null)     this.current.xRadius    = this.delta.xRadius   .get();
-    if (this.delta.yRadius !=null)     this.current.yRadius    = this.delta.yRadius   .get();
+    if (this.delta.xOffset != null) this.current.xOffset = this.delta.xOffset.get();
+    if (this.delta.yOffset != null) this.current.yOffset = this.delta.yOffset.get();
+    if (this.delta.xRadius != null) this.current.xRadius = this.delta.xRadius.get();
+    if (this.delta.yRadius != null) this.current.yRadius = this.delta.yRadius.get();
     if (this.delta.beamLength != null) this.current.beamLength = this.delta.beamLength.get();
-    if (this.delta.beamWidth != null)  this.current.beamWidth  = this.delta.beamWidth .get();
-    if (this.delta.direction != null)  this.current.direction  = this.delta.direction .get();
+    if (this.delta.beamWidth != null) this.current.beamWidth = this.delta.beamWidth.get();
+    if (this.delta.direction != null) this.current.direction = this.delta.direction.get();
   }
 
   /**
@@ -1479,15 +1479,15 @@ class LightDelta {
     if (this.finished()) return this;
     // only update if transition duration isn't 0 (finished)
     if (this.current.transitionDuration > 0) {
-      if (this.delta.color      != null) this.current.color      = this.delta.color     .next().get();
+      if (this.delta.color != null) this.current.color = this.delta.color.next().get();
       if (this.delta.brightness != null) this.current.brightness = this.delta.brightness.next().get();
-      if (this.delta.xOffset    != null) this.current.xOffset    = this.delta.xOffset   .next().get();
-      if (this.delta.yOffset    != null) this.current.yOffset    = this.delta.yOffset   .next().get();
-      if (this.delta.xRadius    != null) this.current.xRadius    = this.delta.xRadius   .next().get();
-      if (this.delta.yRadius    != null) this.current.yRadius    = this.delta.yRadius   .next().get();
+      if (this.delta.xOffset != null) this.current.xOffset = this.delta.xOffset.next().get();
+      if (this.delta.yOffset != null) this.current.yOffset = this.delta.yOffset.next().get();
+      if (this.delta.xRadius != null) this.current.xRadius = this.delta.xRadius.next().get();
+      if (this.delta.yRadius != null) this.current.yRadius = this.delta.yRadius.next().get();
       if (this.delta.beamLength != null) this.current.beamLength = this.delta.beamLength.next().get();
-      if (this.delta.beamWidth  != null) this.current.beamWidth  = this.delta.beamWidth .next().get();
-      if (this.delta.direction  != null) this.current.direction  = this.delta.direction .next().get();
+      if (this.delta.beamWidth != null) this.current.beamWidth = this.delta.beamWidth.next().get();
+      if (this.delta.direction != null) this.current.direction = this.delta.direction.next().get();
       this.current.transitionDuration--;
     } else
       this.current.pauseDuration--;
@@ -1527,7 +1527,7 @@ class NumberDelta {
   clone() {
     let that = new NumberDelta();
     [that.current, that.target, that.duration, that.lazyEquals, that.delta] =
-    [this.current, this.target, this.duration, this.lazyEquals, this.delta];
+      [this.current, this.target, this.duration, this.lazyEquals, this.delta];
     return that;
   }
 
@@ -1586,16 +1586,16 @@ class ColorDelta {
   constructor(start, target = start, fadeDuration = 0, useTicksRemaining = false) {
     this.name = ColorDelta.name;
     if (arguments.length == 0) return;
-    this.current       = start.clone();           // - deep copy
-    this.target        = target.clone();          // - deep copy
-    this.fadeDuration  = orNaN(fadeDuration, 0);  // - use the remaining time (of the hour) or total fade duration
+    this.current = start.clone();           // - deep copy
+    this.target = target.clone();          // - deep copy
+    this.fadeDuration = orNaN(fadeDuration, 0);  // - use the remaining time (of the hour) or total fade duration
     this.fadeDuration -= (useTicksRemaining ? Community.Lighting.ticks() : 0);
-    this.lazyEqual     = false;                   // - true when current value == target value
-    this.delta         = new VRGBA(this.target.v, // - divide by zero is +inf or -inf so deltas work for speed = 0
-                                  (this.target.r - this.current.r) / this.fadeDuration,
-                                  (this.target.g - this.current.g) / this.fadeDuration,
-                                  (this.target.b - this.current.b) / this.fadeDuration,
-                                  (this.target.a - this.current.a) / this.fadeDuration);
+    this.lazyEqual = false;                   // - true when current value == target value
+    this.delta = new VRGBA(this.target.v, // - divide by zero is +inf or -inf so deltas work for speed = 0
+      (this.target.r - this.current.r) / this.fadeDuration,
+      (this.target.g - this.current.g) / this.fadeDuration,
+      (this.target.b - this.current.b) / this.fadeDuration,
+      (this.target.a - this.current.a) / this.fadeDuration);
     this.finished(); // check for duration = 0
   }
   /**
@@ -1603,12 +1603,12 @@ class ColorDelta {
    * @returns {ColorDelta}
    */
   clone() {
-    let that = new  ColorDelta();
-    that.current      = this.current.clone();
-    that.target       = this.target.clone();
+    let that = new ColorDelta();
+    that.current = this.current.clone();
+    that.target = this.target.clone();
     that.fadeDuration = this.fadeDuration;
-    that.lazyEquals   = this.lazyEquals;
-    that.delta        = this.delta.clone();
+    that.lazyEquals = this.lazyEquals;
+    that.delta = this.delta.clone();
     return that;
   }
 
@@ -1656,7 +1656,7 @@ class ColorDelta {
       return new ColorDelta($gameVariables.GetTint(), $gameVariables.GetTintByTime(1), fadeDuration, true);
     } else {              // start color should be the color it would normally be at the given time
       let CL = Community.Lighting; // reference CL
-      let ticks    = fadeDuration == 0 ? CL.minutes() * 60 + CL.seconds() : CL.ticks();
+      let ticks = fadeDuration == 0 ? CL.minutes() * 60 + CL.seconds() : CL.ticks();
       fadeDuration = fadeDuration == 0 ? 60 * 60 : fadeDuration; // dur = 0 needs a ref speed to compute the start color
       let delta = new ColorDelta($gameVariables.GetTintByTime(), $gameVariables.GetTintByTime(1), fadeDuration);
       delta.next(ticks); // get current color based off of ticks elapsed in hour
@@ -1696,10 +1696,34 @@ class ColorDelta {
     if (this.lazyEquals) return true; // lazy-short-circuit comparison followed by real comparison
     if ((this.lazyEquals = this.fadeDuration <= 0)) return (this.current = this.target, true);
     return false;
-   }
+  }
 }
 
 (function ($$) {
+
+  // --- [新增] 条件编译器：将字符串预编译为函数 ---
+  const createLightConditionFunc = (condStr, gameEvent) => {
+    // 如果没有条件，返回 null
+    if (!condStr || condStr.trim() === "") return null;
+    try {
+      // 1. 语法转换
+      // 替换 & -> &&, | -> ||
+      let script = condStr.replace(/(?<!&)&(?!&)/g, ' && ').replace(/(?<!\|)\|(?!\|)/g, ' || ');
+      // 替换 V10 -> $gameVariables.value(10)
+      script = script.replace(/\bV(\d+)\b/gi, (_, id) => `$gameVariables.value(${id})`);
+      // 替换 S10 -> $gameSwitches.value(10)
+      script = script.replace(/\bS(\d+)\b/gi, (_, id) => `$gameSwitches.value(${id})`);
+      // 替换 A-D -> 独立开关 (使用当前事件的各种ID)
+      script = script.replace(/\b([A-D])\b/g, (_, key) => {
+        return `$gameSelfSwitches.value([${gameEvent._mapId}, ${gameEvent._eventId}, "${key.toUpperCase()}"])`;
+      });
+      // 2. 构造函数
+      return new Function("return " + script);
+    } catch (e) {
+      console.warn(`[Community_Lighting] Condition Compile Error: "${condStr}"`, e);
+      return function () { return false; }; // 报错则默认关闭
+    }
+  };
 
   class Mask_Bitmaps {
     constructor(width, height) {
@@ -1721,22 +1745,22 @@ class ColorDelta {
   let light_tiles = [];
   let block_tiles = [];
 
-  let parameters                = $$.parameters;
-  let lightMaskPadding          = +parameters["Lightmask Padding"] || 0;
-  let useSmootherLights         = orBoolean(parameters['Use smoother lights'], false);
-  let light_event_required      = orBoolean(parameters["Light event required"], false);
-  let triangular_flashlight     = orBoolean(parameters["Triangular flashlight"], false);
-  let shift_lights_with_events  = orBoolean(parameters['Shift lights with events'], false);
-  let player_radius             = +parameters['Player radius'] || 0;
-  let reset_each_map            = orBoolean(parameters['Reset Lights'], false);
-  let noteTagKey                = parameters["Note Tag Key"] !== "" ? parameters["Note Tag Key"] : false;
-  let dayNightSaveSeconds       = +parameters['Save DaynightSeconds'] || 0;
-  let dayNightSaveNight         = +parameters["Save Night Switch"] || 0;
-  let dayNightNoAutoshadow      = orBoolean(parameters["No Autoshadow During Night"], false);
-  let hideAutoShadow            = false;
-  let daynightCycleEnabled      = orBoolean(parameters['Daynight Cycle'], true);
-  let daynightTintEnabled       = false;
-  let dayNightList              = (function (dayNight, nightHours) {
+  let parameters = $$.parameters;
+  let lightMaskPadding = +parameters["Lightmask Padding"] || 0;
+  let useSmootherLights = orBoolean(parameters['Use smoother lights'], false);
+  let light_event_required = orBoolean(parameters["Light event required"], false);
+  let triangular_flashlight = orBoolean(parameters["Triangular flashlight"], false);
+  let shift_lights_with_events = orBoolean(parameters['Shift lights with events'], false);
+  let player_radius = +parameters['Player radius'] || 0;
+  let reset_each_map = orBoolean(parameters['Reset Lights'], false);
+  let noteTagKey = parameters["Note Tag Key"] !== "" ? parameters["Note Tag Key"] : false;
+  let dayNightSaveSeconds = +parameters['Save DaynightSeconds'] || 0;
+  let dayNightSaveNight = +parameters["Save Night Switch"] || 0;
+  let dayNightNoAutoshadow = orBoolean(parameters["No Autoshadow During Night"], false);
+  let hideAutoShadow = false;
+  let daynightCycleEnabled = orBoolean(parameters['Daynight Cycle'], true);
+  let daynightTintEnabled = false;
+  let dayNightList = (function (dayNight, nightHours) {
     let result = [];
     try {
       dayNight = JSON.parse(dayNight);
@@ -1819,11 +1843,11 @@ class ColorDelta {
     let hour = $$.hours();
     return dayNightList[hour] instanceof Object ? dayNightList[hour].isNight : false;
   };
-  $$.hours   = () => Math.floor($gameVariables.GetDaynightSeconds () / (60 * 60));
-  $$.minutes = () => Math.floor($gameVariables.GetDaynightSeconds () / 60) % 60;
+  $$.hours = () => Math.floor($gameVariables.GetDaynightSeconds() / (60 * 60));
+  $$.minutes = () => Math.floor($gameVariables.GetDaynightSeconds() / 60) % 60;
   $$.seconds = () => Math.floor($gameVariables.GetDaynightSeconds() % 60);
-  $$.ticks   = () => Math.floor($$.seconds() / $gameVariables.GetDaynightTick() + $$.minutes() *
-                                $gameVariables.GetDaynightSpeed());
+  $$.ticks = () => Math.floor($$.seconds() / $gameVariables.GetDaynightTick() + $$.minutes() *
+    $gameVariables.GetDaynightSpeed());
   $$.time = function (showSeconds) {
     let result = $$.hours() + ":" + $$.minutes().padZero(2);
     if (showSeconds) result = result + ":" + $$.seconds().padZero(2);
@@ -1872,73 +1896,103 @@ class ColorDelta {
   Game_Event.prototype.initLightData = function () {   // Event note tag caching
     this._cl = {};
     this._cl.lastLightPage = this._pageIndex;
-    let tagData = this.getCLTag().toLowerCase();
 
-    // parse new cycle groups format within {} braces and extract from tag data for separate handling
-    // old cycle groups are parsed in tagData loop below and are converted to the new group format
+    let rawTagData = this.getCLTag(); // 获取原始大小写的字符串
+
+    // 1. 先处理逻辑条件 (假设逻辑条件里包含 &, |, !, >, <, =)
+    // 或者我们规定逻辑条件必须放在标签的最末尾，且通过特殊字符识别，或者我们简单地先尝试解析为逻辑
+    let conditionFunc = null;
+
+    // 简单的策略：如果大括号里包含 &, |, !, <, >, =, V, S (且后面跟数字) 或者单独的 A-D，则认为是条件
+    // 为了防止误判颜色循环 {#fff ...}，我们先看是否包含 '#''
+    // 这里使用一个正则来查找可能的逻辑块。
+    // 这是一个权宜之计：匹配 { 非#号开头的内容 }
+    // 更好的方式：你在需求里写的例子是 { !A&!B }。
+
+    let tempTagData = rawTagData;
+    const condCheckRegex = /\{([^\}#]*?)\}/g; // 匹配不含 # 号的大括号内容
+    let match;
+    while ((match = condCheckRegex.exec(tempTagData)) !== null) {
+      let str = match[1];
+      // 简单的特征检测：如果有 V数字, S数字, A-D, !, &, |
+      if (str.match(/[VS]\d+|[A-D]|!|&|\|/i)) {
+        conditionFunc = createLightConditionFunc(str, this);
+        // 从原始字符串中通过替换为空格来移除，供后续处理转小写
+        rawTagData = rawTagData.replace(match[0], " ");
+        break; // 只支持一个条件块
+      }
+    }
+
+    this._cl.conditionFunc = conditionFunc;
+    this._cl.conditionState = true;
+    this._cl.conditionTimer = Math.floor(Math.random() * 15);
+    // 2. 转小写供原插件逻辑通用处理
+    let tagData = rawTagData.toLowerCase();
+
+    // 3. 原有的 cycle group 处理 (现在剩下的 {} 基本都是颜色循环了)
     let cycleGroups = [];
     tagData = tagData.replace(/\{(.*?)\}/g, (_, group) => ((cycleGroups.push(group.split(/\s+/)), '')));
     tagData = tagData.split(/\s+/);
     this._cl.type = LightType[tagData.shift()];
     // Handle parsing of light, fire, and flashlight
     if (this._cl.type) {
-      let isFL       = ()             => this._cl.type.is(LightType.Flashlight); // is flashlight
-      let isEq       = (e, s0, s1)    => s0 && e.equalsIC(s0)     || s1 && e.equalsIC(s1);
-      let isPre      = (e, p0, p1)    => p0 && e.startsWithIC(p0) || p1 && e.startsWithIC(p1);
-      let isPreNum   = (e, p, n0, n1) => p && e.startsWithIC(p) && !isNaN(n0) && (n1 == void (0) || !isNaN(n1));
-      let isNul      = (e)            => e == null;
-      let isDayNight = (e)            => isEq(e, "night", "day");
-      let getNum     = (e)            => orNaN(+e.slice(1).split(":")[0], +e.slice(2).split(":")[0]);
-      let getNum2    = (e)            => orNaN(+e.slice(1).split(":")[1], +e.slice(2).split(":")[1]);
+      let isFL = () => this._cl.type.is(LightType.Flashlight); // is flashlight
+      let isEq = (e, s0, s1) => s0 && e.equalsIC(s0) || s1 && e.equalsIC(s1);
+      let isPre = (e, p0, p1) => p0 && e.startsWithIC(p0) || p1 && e.startsWithIC(p1);
+      let isPreNum = (e, p, n0, n1) => p && e.startsWithIC(p) && !isNaN(n0) && (n1 == void (0) || !isNaN(n1));
+      let isNul = (e) => e == null;
+      let isDayNight = (e) => isEq(e, "night", "day");
+      let getNum = (e) => orNaN(+e.slice(1).split(":")[0], +e.slice(2).split(":")[0]);
+      let getNum2 = (e) => orNaN(+e.slice(1).split(":")[1], +e.slice(2).split(":")[1]);
       let cycleIndex, hasCycle = false;
       tagData.forEach((e) => {
-        let n  = getNum(e);
+        let n = getNum(e);
         let n2 = getNum2(e);
-        if      (!isFL() && isPreNum(e, 'r', n)     && isNul(this._cl.xRadius))    this._cl.xRadius    = n;
-        else if (!isFL() && isPreNum(e, 'xr', n)    && isNul(this._cl.xRadius))    this._cl.xRadius    = n;
-        else if (!isFL() && isPreNum(e, 'yr', n)    && isNul(this._cl.yRadius))    this._cl.yRadius    = n;
-        else if (!isFL() && !isNaN(+e)              && isNul(this._cl.xRadius))    this._cl.xRadius    = +e;
-        else if (isFL()  && !isNaN(+e)              && isNul(this._cl.beamLength)) this._cl.beamLength = +e;
-        else if (isFL()  && !isNaN(+e)              && isNul(this._cl.beamWidth))  this._cl.beamWidth  = +e;
-        else if (isFL()  && isPreNum(e, 'l', n)     && isNul(this._cl.beamLength)) this._cl.beamLength = n;
-        else if (isFL()  && isPreNum(e, 'w', n)     && isNul(this._cl.beamWidth))  this._cl.beamWidth  = n;
-        else if (           isEq(e, 'cycle')        && isNul(this._cl.color))      hasCycle            = true;
-        else if (           isPre(e, '#', 'a#')     && hasCycle)                   cycleIndex = cycleGroups.push([e]) - 2;
-        else if (           !isNaN(+e)              && cycleGroups[cycleIndex])    cycleGroups[cycleIndex] .push('p' + e);
-        else if (           isPre(e, '#', 'a#')     && isNul(this._cl.color))      this._cl.color      = new VRGBA(e);
-        else if (           isPreNum(e, 'e', n)     && isNul(this._cl.enable))     this._cl.enable     = Boolean(n);
-        else if (           isOn(e)                 && isNul(this._cl.enable))     this._cl.enable     = true;
-        else if (           isOff(e)                && isNul(this._cl.enable))     this._cl.enable     = false;
-        else if (           isDayNight(e)           && isNul(this._cl.switch))     this._cl.switch     = e;
-        else if (           isPreNum(e, 'b', n)     && isNul(this._cl.brightness)) this._cl.brightness = (n / 100).clamp(0, 1);
-        else if (!isFL() && isPreNum(e, 'd', n)     && isNul(this._cl.direction))  this._cl.direction  = n;
-        else if (!isFL() && isPreNum(e, 'a', n, n2) && isNul(this._cl.direction))  this._cl.direction  = [Math.PI / 180 * n, Math.PI / 180 * n2];
-        else if ( isFL() && !isNaN(+e)              && isNul(this._cl.direction))  this._cl.direction  = +e;
-        else if ( isFL() && isPreNum(e, 'd', n)     && isNul(this._cl.direction))  this._cl.direction  = CLDirectionMap[n];
-        else if ( isFL() && isPreNum(e, 'a', n)     && isNul(this._cl.direction))  this._cl.direction  = Math.PI / 180 * n;
-        else if (           isPreNum(e, 'x', n)     && isNul(this._cl.xOffset))    this._cl.xOffset    = n;
-        else if (           isPreNum(e, 'y', n)     && isNul(this._cl.yOffset))    this._cl.yOffset    = n;
-        else if (           e.length > 0            && isNul(this._cl.id))         this._cl.id         = e;
+        if (!isFL() && isPreNum(e, 'r', n) && isNul(this._cl.xRadius)) this._cl.xRadius = n;
+        else if (!isFL() && isPreNum(e, 'xr', n) && isNul(this._cl.xRadius)) this._cl.xRadius = n;
+        else if (!isFL() && isPreNum(e, 'yr', n) && isNul(this._cl.yRadius)) this._cl.yRadius = n;
+        else if (!isFL() && !isNaN(+e) && isNul(this._cl.xRadius)) this._cl.xRadius = +e;
+        else if (isFL() && !isNaN(+e) && isNul(this._cl.beamLength)) this._cl.beamLength = +e;
+        else if (isFL() && !isNaN(+e) && isNul(this._cl.beamWidth)) this._cl.beamWidth = +e;
+        else if (isFL() && isPreNum(e, 'l', n) && isNul(this._cl.beamLength)) this._cl.beamLength = n;
+        else if (isFL() && isPreNum(e, 'w', n) && isNul(this._cl.beamWidth)) this._cl.beamWidth = n;
+        else if (isEq(e, 'cycle') && isNul(this._cl.color)) hasCycle = true;
+        else if (isPre(e, '#', 'a#') && hasCycle) cycleIndex = cycleGroups.push([e]) - 2;
+        else if (!isNaN(+e) && cycleGroups[cycleIndex]) cycleGroups[cycleIndex].push('p' + e);
+        else if (isPre(e, '#', 'a#') && isNul(this._cl.color)) this._cl.color = new VRGBA(e);
+        else if (isPreNum(e, 'e', n) && isNul(this._cl.enable)) this._cl.enable = Boolean(n);
+        else if (isOn(e) && isNul(this._cl.enable)) this._cl.enable = true;
+        else if (isOff(e) && isNul(this._cl.enable)) this._cl.enable = false;
+        else if (isDayNight(e) && isNul(this._cl.switch)) this._cl.switch = e;
+        else if (isPreNum(e, 'b', n) && isNul(this._cl.brightness)) this._cl.brightness = (n / 100).clamp(0, 1);
+        else if (!isFL() && isPreNum(e, 'd', n) && isNul(this._cl.direction)) this._cl.direction = n;
+        else if (!isFL() && isPreNum(e, 'a', n, n2) && isNul(this._cl.direction)) this._cl.direction = [Math.PI / 180 * n, Math.PI / 180 * n2];
+        else if (isFL() && !isNaN(+e) && isNul(this._cl.direction)) this._cl.direction = +e;
+        else if (isFL() && isPreNum(e, 'd', n) && isNul(this._cl.direction)) this._cl.direction = CLDirectionMap[n];
+        else if (isFL() && isPreNum(e, 'a', n) && isNul(this._cl.direction)) this._cl.direction = Math.PI / 180 * n;
+        else if (isPreNum(e, 'x', n) && isNul(this._cl.xOffset)) this._cl.xOffset = n;
+        else if (isPreNum(e, 'y', n) && isNul(this._cl.yOffset)) this._cl.yOffset = n;
+        else if (e.length > 0 && isNul(this._cl.id)) this._cl.id = e;
         cycleIndex += 1; // increment index. Valid for 1 iteration after a cycle color is parsed before OOB.
       }, this);
 
       // normalize parameters
-      this._cl.xRadius    = orNaN(this._cl.xRadius, 0);
-      this._cl.yRadius    = orNaN(this._cl.yRadius, 0);
-      this._cl.color      = orNullish(this._cl.color, VRGBA.minRGBA());
-      this._cl.enable     = orBoolean(this._cl.enable, this._cl.id ? false : true);
+      this._cl.xRadius = orNaN(this._cl.xRadius, 0);
+      this._cl.yRadius = orNaN(this._cl.yRadius, 0);
+      this._cl.color = orNullish(this._cl.color, VRGBA.minRGBA());
+      this._cl.enable = orBoolean(this._cl.enable, this._cl.id ? false : true);
       this._cl.brightness = orNaN(this._cl.brightness, 0);
-      this._cl.direction  = orNullish(this._cl.direction, undefined); // must be undefined for later checks
-      this._cl.id         = orNullish(this._cl.id, 0); // Alphanumeric
+      this._cl.direction = orNullish(this._cl.direction, undefined); // must be undefined for later checks
+      this._cl.id = orNullish(this._cl.id, 0); // Alphanumeric
       this._cl.beamLength = orNaN(this._cl.beamLength, 0);
-      this._cl.beamWidth  = orNaN(this._cl.beamWidth, 0);
-      this._cl.xOffset    = orNaN(this._cl.xOffset, 0);
-      this._cl.yOffset    = orNaN(this._cl.yOffset, 0);
-      this._cl.cycle      = this._cl.cycle || null;
+      this._cl.beamWidth = orNaN(this._cl.beamWidth, 0);
+      this._cl.xOffset = orNaN(this._cl.xOffset, 0);
+      this._cl.yOffset = orNaN(this._cl.yOffset, 0);
+      this._cl.cycle = this._cl.cycle || null;
 
       // Store initial light properties
       let props = [this._cl.color, this._cl.enable, this._cl.direction, this._cl.brightness, this._cl.xOffset,
-                   this._cl.yOffset, this._cl.xRadius, this._cl.yRadius, this._cl.length, this._cl.width];
+      this._cl.yOffset, this._cl.xRadius, this._cl.yRadius, this._cl.length, this._cl.width];
 
       // create initial properties
       let startProps = new LightProperties(this._cl.type, ...props);
@@ -1967,7 +2021,7 @@ class ColorDelta {
         if (lightArray[this._cl.id] == null)                                        // check if shared target exists
           lightArray[this._cl.id] = new LightProperties();                          // - if not, create empty reference
         let targetProps = lightArray[this._cl.id];                                  // get target prop reference
-        this._cl.delta  = new LightDelta(startProps, targetProps, this._cl, false); // create light delta object
+        this._cl.delta = new LightDelta(startProps, targetProps, this._cl, false); // create light delta object
       }
     }
   };
@@ -1979,26 +2033,46 @@ class ColorDelta {
       cycleList.push(delta);          // push delta on back
     }
   };
+  Game_Event.prototype.getLightEnabled = function () {
+    // --- [新增] 条件判断逻辑 ---
+    if (this._cl.conditionFunc) {
+      // 每 15 帧更新一次，分散负载
+      if ((Graphics.frameCount + this._cl.conditionTimer) % 15 === 0) {
+        try {
+          this._cl.conditionState = !!this._cl.conditionFunc.call(this);
+        } catch (e) {
+          // 运行时出错（例如变量不复存在），保持上次状态或关闭
+          this._cl.conditionState = false;
+        }
+      }
+      // 如果条件为假，直接返回 false，不看后面的逻辑
+      if (!this._cl.conditionState) return false;
+    }
+    // --- [新增结束] ---
+    if (!this._cl.switch) return this._cl.delta ? this._cl.delta.current.enable : this._cl.enable;
+    return (this._cl.switch.equalsIC("night") && $$.isNight()) ||
+      (this._cl.switch.equalsIC("day") && !$$.isNight());
+  };
   Game_Event.prototype.conditionalLightingNext = function () {
     if (this.getLightCycle() || this.getLightId()) this._cl.delta.next();
   };
-  Game_Event.prototype.getLightEnabled          = function () {
+  Game_Event.prototype.getLightEnabled = function () {
     if (!this._cl.switch) return this._cl.delta ? this._cl.delta.current.enable : this._cl.enable;
     return (this._cl.switch.equalsIC("night") && $$.isNight()) ||
-           (this._cl.switch.equalsIC("day")   && !$$.isNight());
+      (this._cl.switch.equalsIC("day") && !$$.isNight());
   };
-  Game_Event.prototype.getLightType             = function () { return this._cl.type; };
-  Game_Event.prototype.getLightXRadius          = function () { return this._cl.delta ? this._cl.delta.current.xRadius       : this._cl.xRadius; };
-  Game_Event.prototype.getLightYRadius          = function () { return this._cl.delta ? this._cl.delta.current.yRadius       : this._cl.yRadius; };
-  Game_Event.prototype.getLightColor            = function () { return this._cl.delta ? this._cl.delta.current.color.clone() : this._cl.color.clone(); };
-  Game_Event.prototype.getLightBrightness       = function () { return this._cl.delta ? this._cl.delta.current.brightness    : this._cl.brightness; };
-  Game_Event.prototype.getLightDirection        = function () { return this._cl.delta ? this._cl.delta.current.direction     : this._cl.direction ; };
-  Game_Event.prototype.getLightId               = function () { return this._cl.id; };
-  Game_Event.prototype.getLightFlashlightLength = function () { return this._cl.delta ? this._cl.delta.current.beamLength    : this._cl.beamLength; };
-  Game_Event.prototype.getLightFlashlightWidth  = function () { return this._cl.delta ? this._cl.delta.current.beamWidth     : this._cl.beamWidth; };
-  Game_Event.prototype.getLightXOffset          = function () { return this._cl.delta ? this._cl.delta.current.xOffset       : this._cl.xOffset; };
-  Game_Event.prototype.getLightYOffset          = function () { return this._cl.delta ? this._cl.delta.current.yOffset       : this._cl.yOffset; };
-  Game_Event.prototype.getLightCycle            = function () { return this._cl.cycle; };
+  Game_Event.prototype.getLightType = function () { return this._cl.type; };
+  Game_Event.prototype.getLightXRadius = function () { return this._cl.delta ? this._cl.delta.current.xRadius : this._cl.xRadius; };
+  Game_Event.prototype.getLightYRadius = function () { return this._cl.delta ? this._cl.delta.current.yRadius : this._cl.yRadius; };
+  Game_Event.prototype.getLightColor = function () { return this._cl.delta ? this._cl.delta.current.color.clone() : this._cl.color.clone(); };
+  Game_Event.prototype.getLightBrightness = function () { return this._cl.delta ? this._cl.delta.current.brightness : this._cl.brightness; };
+  Game_Event.prototype.getLightDirection = function () { return this._cl.delta ? this._cl.delta.current.direction : this._cl.direction; };
+  Game_Event.prototype.getLightId = function () { return this._cl.id; };
+  Game_Event.prototype.getLightFlashlightLength = function () { return this._cl.delta ? this._cl.delta.current.beamLength : this._cl.beamLength; };
+  Game_Event.prototype.getLightFlashlightWidth = function () { return this._cl.delta ? this._cl.delta.current.beamWidth : this._cl.beamWidth; };
+  Game_Event.prototype.getLightXOffset = function () { return this._cl.delta ? this._cl.delta.current.xOffset : this._cl.xOffset; };
+  Game_Event.prototype.getLightYOffset = function () { return this._cl.delta ? this._cl.delta.current.yOffset : this._cl.yOffset; };
+  Game_Event.prototype.getLightCycle = function () { return this._cl.cycle; };
 
   let _Game_Interpreter_pluginCommand = Game_Interpreter.prototype.pluginCommand;
   /**
@@ -2042,40 +2116,40 @@ class ColorDelta {
   };
 
   if (isRMMZ()) { // RMMZ only command interface
-    let mapOnOff = a  => a.enabled === "true" ? "on" : "off";
-    let hasWait  = a  => a.wait === "true";
-    let tileType = a  => (a.tileType === "terrain" ? "tile" : "region") + (a.lightType ? a.lightType : "block");
+    let mapOnOff = a => a.enabled === "true" ? "on" : "off";
+    let hasWait = a => a.wait === "true";
+    let tileType = a => (a.tileType === "terrain" ? "tile" : "region") + (a.lightType ? a.lightType : "block");
     let tintType = () => $gameParty.inBattle() ? "tintbattle" : "tint";
-    let timeMode = a  => a.cycles ? 'cycles' : '';
-    let dayMode =  a  => a.fade === "true" ? "fade" : "";
-    let tintMode = a  => a.color ? "set" : "reset";
-    let mathMode = a  => a.mode === "set" ? "hour" : a.mode; // set, add, or subtract.
-    let showMode = a  => a.enabled.equalsIC("true") ? (a.showSeconds.equalsIC("true") ? "showseconds" : "show") : "hide";
-    let radMode  = a  => +a.fadeSpeed ? "radiusgrow" : "radius";
+    let timeMode = a => a.cycles ? 'cycles' : '';
+    let dayMode = a => a.fade === "true" ? "fade" : "";
+    let tintMode = a => a.color ? "set" : "reset";
+    let mathMode = a => a.mode === "set" ? "hour" : a.mode; // set, add, or subtract.
+    let showMode = a => a.enabled.equalsIC("true") ? (a.showSeconds.equalsIC("true") ? "showseconds" : "show") : "hide";
+    let radMode = a => +a.fadeSpeed ? "radiusgrow" : "radius";
 
     let r = PluginManager.registerCommand.bind(PluginManager, $$.name); // registar bound with first parameter.
     let f = (c, a) => $$.interpreter.communityLighting_Commands(c, a.filter(_ => _ !== "")); //command wrapper.
 
-    r("masterSwitch",       function (a) { $$.interpreter = this; f("script",     [mapOnOff(a)]); });
-    r("tileBlock",          function (a) { $$.interpreter = this; f(tileType(a),  [a.id, mapOnOff(a), a.color, a.shape, a.xOffset, a.yOffset, a.blockWidth, a.blockHeight]); });
-    r("tileLight",          function (a) { $$.interpreter = this; f(tileType(a),  [a.id, mapOnOff(a), a.color, a.radius, a.brightness]); });
-    r("daynightEnable",     function (a) { $$.interpreter = this; f("daynight",   [mapOnOff(a), dayMode(a)]); });
-    r("setTimeSpeed",       function (a) { $$.interpreter = this; f("dayNight",   ["speed", a.speed]); });
-    r("setTime",            function (a) { $$.interpreter = this; f("dayNight",   [mathMode(a), a.hours, a.minutes, dayMode(a)]); });
-    r("setHoursInDay",      function (a) { $$.interpreter = this; f("dayNight",   ["hoursinday", a.hours, dayMode(a)]); });
-    r("showTime",           function (a) { $$.interpreter = this; f("dayNight",   [showMode(a)]); });
-    r("setHourColor",       function (a) { $$.interpreter = this; f("dayNight",   ["color", a.hour, a.color, dayMode(a)]); });
-    r("flashlight",         function (a) { $$.interpreter = this; f("flashLight", [mapOnOff(a), a.beamLength, a.beamWidth, a.color, a.density]); });
-    r("setFire",            function (a) { $$.interpreter = this; f("setFire",    [a.radiusShift, a.redYellowShift]); });
-    r("playerLightRadius",  function (a) { $$.interpreter = this; f("light",      [radMode(a), a.radius, a.color, "B" + a.brightness, a.fadeSpeed]); });
-    r("activateById",       function (a) { $$.interpreter = this; f("light",      [mapOnOff(a), a.id]); });
-    r("lightColor",         function (a) { $$.interpreter = this; f("light",      ["color", a.id, a.color]); });
-    r("resetLightSwitches", function ()  { $$.interpreter = this; f("light",      ["switch", "reset"]); });
-    r("setTint",            function (a) { $$.interpreter = this; f(tintType(),   [tintMode(a), a.color, a.fadeSpeed, timeMode(a)]); if (hasWait(a)) f(tintType(), ["wait"]); });
-    r("resetTint",          function (a) { $$.interpreter = this; f(tintType(),   ["reset", a.fadeSpeed, timeMode(a)]); if (hasWait(a)) f(tintType(), ["wait"]); });
-    r("waitTint",           function ()  { $$.interpreter = this; f(tintType(),   ["wait"]); });
-    r("condLight",          function (a) { $$.interpreter = this; f("light",      ["cond", a.id].concat(a.properties.split(/\s+/))); if (hasWait(a)) f("light", ["wait", a.id]); });
-    r("condLightWait",      function (a) { $$.interpreter = this; f("light",      ["wait", a.id]); });
+    r("masterSwitch", function (a) { $$.interpreter = this; f("script", [mapOnOff(a)]); });
+    r("tileBlock", function (a) { $$.interpreter = this; f(tileType(a), [a.id, mapOnOff(a), a.color, a.shape, a.xOffset, a.yOffset, a.blockWidth, a.blockHeight]); });
+    r("tileLight", function (a) { $$.interpreter = this; f(tileType(a), [a.id, mapOnOff(a), a.color, a.radius, a.brightness]); });
+    r("daynightEnable", function (a) { $$.interpreter = this; f("daynight", [mapOnOff(a), dayMode(a)]); });
+    r("setTimeSpeed", function (a) { $$.interpreter = this; f("dayNight", ["speed", a.speed]); });
+    r("setTime", function (a) { $$.interpreter = this; f("dayNight", [mathMode(a), a.hours, a.minutes, dayMode(a)]); });
+    r("setHoursInDay", function (a) { $$.interpreter = this; f("dayNight", ["hoursinday", a.hours, dayMode(a)]); });
+    r("showTime", function (a) { $$.interpreter = this; f("dayNight", [showMode(a)]); });
+    r("setHourColor", function (a) { $$.interpreter = this; f("dayNight", ["color", a.hour, a.color, dayMode(a)]); });
+    r("flashlight", function (a) { $$.interpreter = this; f("flashLight", [mapOnOff(a), a.beamLength, a.beamWidth, a.color, a.density]); });
+    r("setFire", function (a) { $$.interpreter = this; f("setFire", [a.radiusShift, a.redYellowShift]); });
+    r("playerLightRadius", function (a) { $$.interpreter = this; f("light", [radMode(a), a.radius, a.color, "B" + a.brightness, a.fadeSpeed]); });
+    r("activateById", function (a) { $$.interpreter = this; f("light", [mapOnOff(a), a.id]); });
+    r("lightColor", function (a) { $$.interpreter = this; f("light", ["color", a.id, a.color]); });
+    r("resetLightSwitches", function () { $$.interpreter = this; f("light", ["switch", "reset"]); });
+    r("setTint", function (a) { $$.interpreter = this; f(tintType(), [tintMode(a), a.color, a.fadeSpeed, timeMode(a)]); if (hasWait(a)) f(tintType(), ["wait"]); });
+    r("resetTint", function (a) { $$.interpreter = this; f(tintType(), ["reset", a.fadeSpeed, timeMode(a)]); if (hasWait(a)) f(tintType(), ["wait"]); });
+    r("waitTint", function () { $$.interpreter = this; f(tintType(), ["wait"]); });
+    r("condLight", function (a) { $$.interpreter = this; f("light", ["cond", a.id].concat(a.properties.split(/\s+/))); if (hasWait(a)) f("light", ["wait", a.id]); });
+    r("condLightWait", function (a) { $$.interpreter = this; f("light", ["wait", a.id]); });
   }
 
   /**
@@ -2089,7 +2163,7 @@ class ColorDelta {
     let [id, enabled, color, radius, brightness] = args;
     let tile = new TileLight(tileType, lightType, id, enabled, color, radius, brightness);
     let index = tilearray.findIndex(e => e.tileType === tile.tileType && e.lightType === tile.lightType &&
-                                    e.id === tile.id);
+      e.id === tile.id);
     void (index === -1 ? tilearray.push(tile) : tilearray[index] = tile);
     $gameVariables.SetTileLightArray(tilearray);
     $$.ReloadTagArea();
@@ -2295,21 +2369,21 @@ class ColorDelta {
     let disableReg = new RegExp("<" + keyString + ":\\s*disabled>", "i");
 
     if (mapNoteRaw.match(disableReg)) {
-        // 1. 获取上下文（因为还没运行到下方定义它的地方，这里需单独获取）
-        let ctxMul = this._maskBitmaps.multiply.context;
-        let ctxAdd = this._maskBitmaps.additive.context;
-        
-        // 2. 强制填充白色（正片叠底模式下，白色 = 透明/白天）
-        this._maskBitmaps.multiply.fillRect(0, 0, maxX, maxY, '#ffffff');
-        // 3. 清空叠加层
-        this._maskBitmaps.additive.clearRect(0, 0, maxX, maxY);
-        
-        // 4. 重要：即使禁用了，也要更新一下纹理，防止画面卡在上一帧的残留上
-        if (this._maskBitmaps.multiply._baseTexture) this._maskBitmaps.multiply._baseTexture.update();
-        if (this._maskBitmaps.additive._baseTexture) this._maskBitmaps.additive._baseTexture.update();
+      // 1. 获取上下文（因为还没运行到下方定义它的地方，这里需单独获取）
+      let ctxMul = this._maskBitmaps.multiply.context;
+      let ctxAdd = this._maskBitmaps.additive.context;
 
-        // 5. 立即结束，跳过后面所有的光照运算
-        return;
+      // 2. 强制填充白色（正片叠底模式下，白色 = 透明/白天）
+      this._maskBitmaps.multiply.fillRect(0, 0, maxX, maxY, '#ffffff');
+      // 3. 清空叠加层
+      this._maskBitmaps.additive.clearRect(0, 0, maxX, maxY);
+
+      // 4. 重要：即使禁用了，也要更新一下纹理，防止画面卡在上一帧的残留上
+      if (this._maskBitmaps.multiply._baseTexture) this._maskBitmaps.multiply._baseTexture.update();
+      if (this._maskBitmaps.additive._baseTexture) this._maskBitmaps.additive._baseTexture.update();
+
+      // 5. 立即结束，跳过后面所有的光照运算
+      return;
     }
     // ============================================================
 
@@ -2342,12 +2416,12 @@ class ColorDelta {
     }
 
     let playerflashlight = $gameVariables.GetFlashlight();
-    let playercolor      = $gameVariables.GetPlayerColor();
+    let playercolor = $gameVariables.GetPlayerColor();
     let flashlightlength = $gameVariables.GetFlashlightLength();
-    let flashlightwidth  = $gameVariables.GetFlashlightWidth();
-    let playerflicker    = $gameVariables.GetFire();
+    let flashlightwidth = $gameVariables.GetFlashlightWidth();
+    let playerflicker = $gameVariables.GetFire();
     let playerbrightness = $gameVariables.GetPlayerBrightness();
-    let iplayer_radius   = Math.floor(player_radius);
+    let iplayer_radius = Math.floor(player_radius);
 
     if (playerflashlight == true) {
       this._maskBitmaps.radialgradientFlashlight(x1, y1, playercolor, pd, flashlightlength, flashlightwidth);
@@ -2390,7 +2464,7 @@ class ColorDelta {
       let evid, cur;
       if (i != -1) {
         evid = event_id[i];
-        cur  = events[eventObjId[i]];
+        cur = events[eventObjId[i]];
       } else { // call the functions early to cache them. Avoids some stuttering on first calls.
         if (!cachedFunctions) {
           cachedFunctions = true;
@@ -2427,14 +2501,14 @@ class ColorDelta {
       if (lightType) {
         cur.cycleLightingNext();       // Cycle colors
         cur.conditionalLightingNext(); // conditional lighting
-        let objectflicker  = lightType.is(LightType.Fire);
-        let lightId        = cur.getLightId();
-        let color          = cur.getLightColor();      // light color
-        let direction      = cur.getLightDirection();  // direction
-        let brightness     = cur.getLightBrightness(); // brightness
-        let xOffset        = cur.getLightXOffset() * $gameMap.tileWidth();
-        let yOffset        = cur.getLightYOffset() * $gameMap.tileHeight();
-        let state          = cur.getLightEnabled();    // checks for on, off, day, and night
+        let objectflicker = lightType.is(LightType.Fire);
+        let lightId = cur.getLightId();
+        let color = cur.getLightColor();      // light color
+        let direction = cur.getLightDirection();  // direction
+        let brightness = cur.getLightBrightness(); // brightness
+        let xOffset = cur.getLightXOffset() * $gameMap.tileWidth();
+        let yOffset = cur.getLightYOffset() * $gameMap.tileHeight();
+        let state = cur.getLightEnabled();    // checks for on, off, day, and night
 
         // Set kill switch to ON if the conditional light is deactivated,
         // or to OFF if it is active.
@@ -2462,7 +2536,7 @@ class ColorDelta {
           if (lightType.is(LightType.Flashlight)) {
             let ldir = RMDirectionMap[events[event_stacknumber[i]]._direction] || 0;
             let flashlength = cur.getLightFlashlightLength();
-            let flashwidth  = cur.getLightFlashlightWidth();
+            let flashwidth = cur.getLightFlashlightWidth();
             if (!isNaN(direction)) ldir = direction;
             this._maskBitmaps.radialgradientFlashlight(lx1, ly1, color, ldir, flashlength, flashwidth);
           } else if (lightType.is(LightType.Light, LightType.Fire)) {
@@ -2478,9 +2552,9 @@ class ColorDelta {
     //glow/colorfade
     if ($gameTemp.testAndSet('_glowTimeout', Math.floor((new Date()).getTime() / 100))) {
       $gameTemp._glowDirection = orNaN($gameTemp._glowDirection, 1);
-      $gameTemp._glowAmount    = orNaN($gameTemp._glowAmount, 0) + $gameTemp._glowDirection;
+      $gameTemp._glowAmount = orNaN($gameTemp._glowAmount, 0) + $gameTemp._glowDirection;
       if ($gameTemp._glowAmount > 120) $gameTemp._glowDirection = -1;
-      if ($gameTemp._glowAmount < 1)   $gameTemp._glowDirection = 1;
+      if ($gameTemp._glowAmount < 1) $gameTemp._glowDirection = 1;
     }
 
     light_tiles = $gameVariables.GetLightTiles();
@@ -2595,9 +2669,9 @@ class ColorDelta {
     }
     else {
       for (let distanceFromCenter = 0; distanceFromCenter < 1; distanceFromCenter += 0.1) {
-        let newRed   = c.r - (distanceFromCenter * 100 * 2.55);
+        let newRed = c.r - (distanceFromCenter * 100 * 2.55);
         let newGreen = c.g - (distanceFromCenter * 100 * 2.55);
-        let newBlue  = c.b - (distanceFromCenter * 100 * 2.55);
+        let newBlue = c.b - (distanceFromCenter * 100 * 2.55);
         let newAlpha = 1 - distanceFromCenter;
         if (brightness > 0) newAlpha = Math.max(0, brightness - distanceFromCenter);
         this.addColorStop(distanceFromCenter, rgba(~~newRed, ~~newGreen, ~~newBlue, newAlpha));
@@ -2733,77 +2807,77 @@ class ColorDelta {
         let xP, yP; // pivot
         switch (direction) {
           case 0:
-            xS1 = x - r;    yS1 = y - r;
-            xE1 = r * 2;    yE1 = r * 2;
-            xP  = x;        yP  = y;
+            xS1 = x - r; yS1 = y - r;
+            xE1 = r * 2; yE1 = r * 2;
+            xP = x; yP = y;
             break;
           case 1: // north wall
-            xS1 = x - r;    yS1 = y - ph;
-            xE1 = r * 2;    yE1 = r * 2;
-            xP  = x;        yP  = yS1;
+            xS1 = x - r; yS1 = y - ph;
+            xE1 = r * 2; yE1 = r * 2;
+            xP = x; yP = yS1;
             break;
           case 2: // east wall
-            xS1 = x - r;    yS1 = y - r;
-            xE1 = r + pw;   yE1 = r * 2;
-            xP  = x + pw;   yP  = y;
+            xS1 = x - r; yS1 = y - r;
+            xE1 = r + pw; yE1 = r * 2;
+            xP = x + pw; yP = y;
             break;
           case 3: // south wall
-            xS1 = x - r;    yS1 = y - r;
-            xE1 = r * 2;    yE1 = r + ph;
-            xP  = x;        yP  = y + ph;
+            xS1 = x - r; yS1 = y - r;
+            xE1 = r * 2; yE1 = r + ph;
+            xP = x; yP = y + ph;
             break;
           case 4: // west wall
-            xS1 = x - pw;   yS1 = y - r;
-            xE1 = r * 2;    yE1 = r * 2;
-            xP  = xS1;      yP  = y;
+            xS1 = x - pw; yS1 = y - r;
+            xE1 = r * 2; yE1 = r * 2;
+            xP = xS1; yP = y;
             break;
           case 5: // north east wall
-            xS1 = x - r;    yS1 = y - ph;
-            xE1 = r + pw;   yE1 = r + ph;
-            xP  = x + pw;   yP  = yS1;
+            xS1 = x - r; yS1 = y - ph;
+            xE1 = r + pw; yE1 = r + ph;
+            xP = x + pw; yP = yS1;
             break;
           case 6: // south east wall
-            xS1 = x - r;    yS1 = y - r;
-            xE1 = r + pw;   yE1 = r + ph;
-            xP  = x + pw;   yP  = y + ph;
+            xS1 = x - r; yS1 = y - r;
+            xE1 = r + pw; yE1 = r + ph;
+            xP = x + pw; yP = y + ph;
             break;
           case 7: // south west wall
-            xS1 = x - pw;   yS1 = y - r;
-            xE1 = r + pw;   yE1 = r + ph;
-            xP  = xS1;      yP  = y + ph;
+            xS1 = x - pw; yS1 = y - r;
+            xE1 = r + pw; yE1 = r + ph;
+            xP = xS1; yP = y + ph;
             break;
           case 8: // north west wall
-            xS1 = x - pw;   yS1 = y - ph;
-            xE1 = r + pw;   yE1 = r + ph;
-            xP  = xS1;      yP  = yS1;
+            xS1 = x - pw; yS1 = y - ph;
+            xE1 = r + pw; yE1 = r + ph;
+            xP = xS1; yP = yS1;
             break;
           case 9: // north east corner
-            xS1 = x - r;    yS1 = y - ph;
-            xE1 = r * 2;    yE1 = r * 2;
-            xS2 = x - r;    yS2 = y - r;
-            xE2 = r - pw;   yE2 = r - ph;
-            xP  = x - pw;   yP = yS1;
+            xS1 = x - r; yS1 = y - ph;
+            xE1 = r * 2; yE1 = r * 2;
+            xS2 = x - r; yS2 = y - r;
+            xE2 = r - pw; yE2 = r - ph;
+            xP = x - pw; yP = yS1;
             break;
           case 10: // south east corner
-            xS1 = x - r;    yS1 = y - r;
-            xE1 = r * 2;    yE1 = r + ph;
-            xS2 = x - r;    yS2 = y + ph;
-            xE2 = r - pw;   yE2 = r - ph;
-            xP =  x - pw;   yP = yS2;
+            xS1 = x - r; yS1 = y - r;
+            xE1 = r * 2; yE1 = r + ph;
+            xS2 = x - r; yS2 = y + ph;
+            xE2 = r - pw; yE2 = r - ph;
+            xP = x - pw; yP = yS2;
             break;
           case 11: // south west corner
-            xS1 = x - r;    yS1 = y - r;
-            xE1 = r * 2;    yE1 = r + ph;
-            xS2 = x + pw;   yS2 = y + ph;
-            xE2 = r - pw;   yE2 = r - ph;
-            xP  = xS2;      yP  = yS2;
+            xS1 = x - r; yS1 = y - r;
+            xE1 = r * 2; yE1 = r + ph;
+            xS2 = x + pw; yS2 = y + ph;
+            xE2 = r - pw; yE2 = r - ph;
+            xP = xS2; yP = yS2;
             break;
           case 12: // north west corner
-            xS1 = x - r;    yS1 = y - ph;
-            xE1 = r * 2;    yE1 = r * 2;
-            xS2 = x + pw;   yS2 = y - r;
-            xE2 = r - pw;   yE2 = r - ph;
-            xP  = xS2;      yP  = yS1;
+            xS1 = x - r; yS1 = y - ph;
+            xE1 = r * 2; yE1 = r * 2;
+            xS2 = x + pw; yS2 = y - r;
+            xE2 = r - pw; yE2 = r - ph;
+            xP = xS2; yP = yS1;
             break;
         }
 
@@ -2952,7 +3026,7 @@ class ColorDelta {
 
       // Grab web colors for beam
       let outerHex = c.toWebHex({ a: Math.round(0.65 * c.a) });
-      let innerHex = c.toWebHex({ a: Math.round(0.1  * c.a) });
+      let innerHex = c.toWebHex({ a: Math.round(0.1 * c.a) });
 
       // gradients have smoother color transitions for transparent colors (a < 255) in chrome
       let grad = ctxMul.createRadialGradient(0, 0, 0, 1, 1, 1);
@@ -2967,7 +3041,7 @@ class ColorDelta {
       ctxMul.quadraticCurveTo(xStartCtrlPoint, yStartCtrlPoint, xLeftBeamStart, yLeftBeamStart);
       ctxMul.lineTo(xLeftBeamEnd, yLeftBeamEnd);
       ctxMul.bezierCurveTo(xLeftCtrlPoint, yLeftCtrlPoint, xRightCtrlPoint, yRightCtrlPoint, xRightBeamEnd,
-                           yRightBeamEnd);
+        yRightBeamEnd);
       ctxMul.lineTo(xRightBeamStart, yRightBeamStart);
       ctxMul.fill();
       if (c.v) {
@@ -2979,7 +3053,7 @@ class ColorDelta {
         ctxAdd.quadraticCurveTo(xStartCtrlPoint, yStartCtrlPoint, xLeftBeamStart, yLeftBeamStart);
         ctxAdd.lineTo(xLeftBeamEnd, yLeftBeamEnd);
         ctxAdd.bezierCurveTo(xLeftCtrlPoint, yLeftCtrlPoint, xRightCtrlPoint, yRightCtrlPoint, xRightBeamEnd,
-                             yRightBeamEnd);
+          yRightBeamEnd);
         ctxAdd.lineTo(xRightBeamStart, yRightBeamStart);
         ctxAdd.fill();
       }
@@ -2992,7 +3066,7 @@ class ColorDelta {
       ctxMul.quadraticCurveTo(xStartCtrlPoint, yStartCtrlPoint, xLeftBeamStart, yLeftBeamStart);
       ctxMul.lineTo(xLeftBeamEnd, yLeftBeamEnd);
       ctxMul.bezierCurveTo(xLeftCtrlPoint, yLeftCtrlPoint, xRightCtrlPoint, yRightCtrlPoint, xRightBeamEnd,
-                           yRightBeamEnd);
+        yRightBeamEnd);
       ctxMul.lineTo(xRightBeamStart, yRightBeamStart);
       ctxMul.fill();
       if (c.v) {
@@ -3004,7 +3078,7 @@ class ColorDelta {
         ctxAdd.quadraticCurveTo(xStartCtrlPoint, yStartCtrlPoint, xLeftBeamStart, yLeftBeamStart);
         ctxAdd.lineTo(xLeftBeamEnd, yLeftBeamEnd);
         ctxAdd.bezierCurveTo(xLeftCtrlPoint, yLeftCtrlPoint, xRightCtrlPoint, yRightCtrlPoint, xRightBeamEnd,
-                             yRightBeamEnd);
+          yRightBeamEnd);
         ctxAdd.lineTo(xRightBeamStart, yRightBeamStart);
         ctxAdd.fill();
       }
@@ -3118,8 +3192,8 @@ class ColorDelta {
     // if we came from a map, script is active, configuration authorizes using lighting effects,
     // then use the tint of the map, otherwise use full brightness
     let c = (!DataManager.isBattleTest() && !DataManager.isEventTest() && $gameMap.mapId() >= 0 &&
-             $gameVariables.GetScriptActive() && options_lighting_on && lightInBattle) ?
-            $gameVariables.GetTint() : VRGBA.maxRGBA();
+      $gameVariables.GetScriptActive() && options_lighting_on && lightInBattle) ?
+      $gameVariables.GetTint() : VRGBA.maxRGBA();
 
     let note = $$.getCLTag($$.getFirstComment($dataTroops[$gameTroop._troopId].pages[0]));
     if ((/^tintbattle\b/i).test(note)) {
@@ -3243,7 +3317,7 @@ class ColorDelta {
       let property = variable[property_name];
 
       // Check for CL names at root to avoid checking non-cl game variables to avoid any incompatibility issues
-      if(cl_name_check && !property_name.startsWithIC("_Community_Lighting") && !property_name.startsWith("_cl")) continue;
+      if (cl_name_check && !property_name.startsWithIC("_Community_Lighting") && !property_name.startsWith("_cl")) continue;
 
       // Make sure the type is an actual object (we only need to reconstruct objects)
       if (property == null || typeof property != "object") continue;
@@ -3259,7 +3333,7 @@ class ColorDelta {
         Object.setPrototypeOf(property, LightDelta.prototype);
       else if (property.name == NumberDelta.name)
         Object.setPrototypeOf(property, NumberDelta.prototype);
-        $$.ReconstructTypes(property, false); // no need to do name checks for inner-objects
+      $$.ReconstructTypes(property, false); // no need to do name checks for inner-objects
     }
   };
 
@@ -3294,7 +3368,7 @@ class ColorDelta {
         }
       }
     }
-    
+
     // Mark game as not loaded
     GameLoaded = false;
 
@@ -3564,23 +3638,23 @@ class ColorDelta {
         $gameVariables.SetTintTarget(delta);
       }
     };
-    let isCmd                      = (s)    => a[0].equalsIC(s);
-    let showTime                   = (w, s) => [gV._clShowTimeWindow, gV._clShowTimeWindowSeconds] = [w, s];
-    let [gV, a]                    = [$gameVariables, args];
+    let isCmd = (s) => a[0].equalsIC(s);
+    let showTime = (w, s) => [gV._clShowTimeWindow, gV._clShowTimeWindowSeconds] = [w, s];
+    let [gV, a] = [$gameVariables, args];
     let [secondsTotal, hoursInDay] = [gV.GetDaynightSeconds(), gV.GetDaynightHoursinDay()];
-    let [hours, minutes, seconds]  = [$$.hours(), $$.minutes(), $$.seconds()];
-    if      (isCmd('on'))          void (daynightTintEnabled = true, setTimeColorDelta());              // enable daynight tint
-    else if (isCmd('off'))         void (daynightTintEnabled = false, setColorDelta());                 // disable daynight tint
-    else if (isCmd('speed'))       void (gV.SetDaynightSpeed(a[1]), setTimeColorDelta());               // set daynight speed
-    else if (isCmd('add'))         void modTime(hoursInDay, +a[1],   +a[2],   secondsTotal, 0);         // add to cur time
-    else if (isCmd('subtract'))    void modTime(hoursInDay, -+a[1], -+a[2],   secondsTotal, 0);         // sub from cur time
-    else if (isCmd('hour'))        void modTime(hoursInDay, +a[1],   +a[2],   0);                       // set the cur time
-    else if (isCmd('hoursinday'))  void modTime(+a[1],      hours,   minutes, seconds);                 // set number of hours in day
-    else if (isCmd('show'))        void showTime(true, false);                                          // show clock
+    let [hours, minutes, seconds] = [$$.hours(), $$.minutes(), $$.seconds()];
+    if (isCmd('on')) void (daynightTintEnabled = true, setTimeColorDelta());              // enable daynight tint
+    else if (isCmd('off')) void (daynightTintEnabled = false, setColorDelta());                 // disable daynight tint
+    else if (isCmd('speed')) void (gV.SetDaynightSpeed(a[1]), setTimeColorDelta());               // set daynight speed
+    else if (isCmd('add')) void modTime(hoursInDay, +a[1], +a[2], secondsTotal, 0);         // add to cur time
+    else if (isCmd('subtract')) void modTime(hoursInDay, -+a[1], -+a[2], secondsTotal, 0);         // sub from cur time
+    else if (isCmd('hour')) void modTime(hoursInDay, +a[1], +a[2], 0);                       // set the cur time
+    else if (isCmd('hoursinday')) void modTime(+a[1], hours, minutes, seconds);                 // set number of hours in day
+    else if (isCmd('show')) void showTime(true, false);                                          // show clock
     else if (isCmd('showseconds')) void showTime(true, true);                                           // show clock seconds
-    else if (isCmd('hide'))        void showTime(false, false);                                         // hide clock
-    else if (isCmd('color'))       void (gV.SetTintAtHour(a[1], new VRGBA(a[2])), setTimeColorDelta()); // change hour color
-};
+    else if (isCmd('hide')) void showTime(false, false);                                         // hide clock
+    else if (isCmd('color')) void (gV.SetTintAtHour(a[1], new VRGBA(a[2])), setTimeColorDelta()); // change hour color
+  };
 
   let _Tilemap_drawShadow = Tilemap.prototype._drawShadow;
   Tilemap.prototype._drawShadow = function (bitmap, shadowBits, dx, dy) {

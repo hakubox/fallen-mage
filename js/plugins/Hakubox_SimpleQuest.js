@@ -487,6 +487,16 @@
  * @type boolean
  * @default true
  *
+ * @command UpdateTitle
+ * @text ➔ 更新描述
+ * @desc 修改任务描述文本（例如：任务进入第二阶段，提示变了）。
+ * @arg templateId
+ * @text 任务ID
+ * @type string
+ * @arg title
+ * @text 新的标题
+ * @type string
+ *
  * @command UpdateDesc
  * @text ➔ 更新描述
  * @desc 修改任务描述文本（例如：任务进入第二阶段，提示变了）。
@@ -1015,6 +1025,14 @@
             const instance = $gameSystem.getLatestInstance(templateId);
             if (instance) {
                 instance.desc = newDesc;
+                $gameSystem.requestHudRefresh();
+            }
+        },
+
+        updateLatestTitle(templateId, newTitle) {
+            const instance = $gameSystem.getLatestInstance(templateId);
+            if (instance) {
+                instance.title = newTitle;
                 $gameSystem.requestHudRefresh();
             }
         },
@@ -1980,6 +1998,10 @@
 
     PluginManager.registerCommand(PLUGIN_NAME, "UpdateDesc", args => {
         window.SimpleQuest.updateLatestDesc(args.templateId, args.desc);
+    });
+
+    PluginManager.registerCommand(PLUGIN_NAME, "UpdateTitle", args => {
+        window.SimpleQuest.updateLatestTitle(args.templateId, args.title);
     });
 
     PluginManager.registerCommand(PLUGIN_NAME, "ShowHud", args => {
