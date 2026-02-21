@@ -472,7 +472,7 @@
     Scene_Map.prototype.createCustomHUD = function () {
         const rect = new Rectangle(config.x, config.y, config.width, config.height);
         this._customHudWindow = new Window_CustomHUD(rect);
-        this.addWindow(this._customHudWindow);
+        this.addChild(this._customHudWindow);
     };
 
 })();
