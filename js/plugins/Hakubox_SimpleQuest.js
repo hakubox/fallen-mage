@@ -487,6 +487,16 @@
  * @type boolean
  * @default true
  *
+ * @command UpdateTitle
+ * @text ➔ 更新描述
+ * @desc 修改任务描述文本（例如：任务进入第二阶段，提示变了）。
+ * @arg templateId
+ * @text 任务ID
+ * @type string
+ * @arg title
+ * @text 新的标题
+ * @type string
+ *
  * @command UpdateDesc
  * @text ➔ 更新描述
  * @desc 修改任务描述文本（例如：任务进入第二阶段，提示变了）。
@@ -1019,6 +1029,14 @@
             }
         },
 
+        updateLatestTitle(templateId, newTitle) {
+            const instance = $gameSystem.getLatestInstance(templateId);
+            if (instance) {
+                instance.title = newTitle;
+                $gameSystem.requestHudRefresh();
+            }
+        },
+
         removeLatest(templateId) {
             const instance = $gameSystem.getLatestInstance(templateId);
             if (instance) {
@@ -1358,6 +1376,7 @@
         if (includeHidden) {
             return this._questInstances;
         }
+        if (!this._questInstances) return [];
         // 否则进行过滤：筛除掉那些 conditionFunc 返回 false 的任务
         return this._questInstances.filter(q => {
             const tpl = CONFIG.templates[q.templateId];
@@ -1980,6 +1999,10 @@
 
     PluginManager.registerCommand(PLUGIN_NAME, "UpdateDesc", args => {
         window.SimpleQuest.updateLatestDesc(args.templateId, args.desc);
+    });
+
+    PluginManager.registerCommand(PLUGIN_NAME, "UpdateTitle", args => {
+        window.SimpleQuest.updateLatestTitle(args.templateId, args.title);
     });
 
     PluginManager.registerCommand(PLUGIN_NAME, "ShowHud", args => {
