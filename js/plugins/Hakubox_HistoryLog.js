@@ -78,7 +78,7 @@
  * @param Template List
  * @text 历史记录模板列表
  * @type struct<LogTemplate>[]
- * @default ["{\"Id\":\"map_move\",\"Format\":\"移动到了：$1\",\"FontSize\":\"20\",\"Color\":\"16\",\"Align\":\"left\",\"ExtraData\":\"return { icon: 0 }\"}","{\"Id\":\"item_use\",\"Format\":\"$2 使用了 $1。\",\"FontSize\":\"20\",\"Color\":\"0\",\"Align\":\"left\",\"ExtraData\":\"\"}","{\"Id\":\"choice\",\"Format\":\"做出选择：$1\",\"FontSize\":\"22\",\"Color\":\"14\",\"Align\":\"center\",\"ExtraData\":\"\"}","{\"Id\":\"dialogue\",\"Format\":\"$2: $1\",\"FontSize\":\"22\",\"Color\":\"0\",\"Align\":\"left\",\"ExtraData\":\"\"}"]
+ * @default ["{\"Id\":\"map_move\",\"Enabled\":\"true\",\"Format\":\"移动到了：$1\",\"FontSize\":\"20\",\"Color\":\"16\",\"Align\":\"left\",\"ExtraData\":\"return { icon: 0 }\"}","{\"Id\":\"item_use\",\"Enabled\":\"true\",\"Format\":\"$2 使用了 $1。\",\"FontSize\":\"20\",\"Color\":\"0\",\"Align\":\"left\",\"ExtraData\":\"\"}","{\"Id\":\"choice\",\"Enabled\":\"true\",\"Format\":\"做出选择：$1\",\"FontSize\":\"22\",\"Color\":\"14\",\"Align\":\"center\",\"ExtraData\":\"\"}","{\"Id\":\"dialogue\",\"Enabled\":\"true\",\"Format\":\"$2: $1\",\"FontSize\":\"22\",\"Color\":\"0\",\"Align\":\"left\",\"ExtraData\":\"\"}"]
  * @desc 定义所有可用的日志类型及其样式。
  *
  * @param Max Records
@@ -124,6 +124,13 @@
  * @param Id
  * @text 模板 ID (唯一)
  * @type string
+ * 
+ * @param Enabled
+ * @text 是否启用
+ * @type boolean
+ * @on 启用
+ * @off 禁用
+ * @default true
  *
  * @param Format
  * @text 内容格式
@@ -230,6 +237,7 @@ Hakubox.HistoryLog = {};
                 const data = JSON.parse(jsonStr);
                 Config.templates[data.Id] = {
                     id: data.Id,
+                    enabled: data.Enabled === "true",
                     format: data.Format || "",
                     fontSize: Number(data.FontSize || 22),
                     color: data.Color || "0",
@@ -266,6 +274,10 @@ Hakubox.HistoryLog = {};
      */
     Game_System.prototype.addHistoryLog = function(templateId, contentObj) {
         if (Config.disableSwitch > 0 && $gameSwitches.value(Config.disableSwitch)) return;
+        
+        // 检查该类型模板是否被禁用
+        // 如果模板不存在或者 enabled 为 false，则直接拦截
+        if (!Config.templates[templateId] || !Config.templates[templateId].enabled) return;
         
         // --- 逻辑修复: 地图名防止读档重复记录 ---
         if (templateId === 'map_move') {
