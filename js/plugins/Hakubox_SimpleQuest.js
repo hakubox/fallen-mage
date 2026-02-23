@@ -250,6 +250,12 @@
  * @type number
  * @default 8
  *
+ * @param taskSpacing
+ * @text 任务间距
+ * @desc 每一个任务条目之间的垂直距离。
+ * @type number
+ * @default 10
+ *
  * @param sectionSpacing
  * @text 分组间距
  * @desc “主线”组和“支线”组之间的垂直距离。
@@ -299,6 +305,12 @@
  * @text 字体大小: 奖励文本
  * @type number
  * @default 14
+ * 
+ * @param lineSpacing
+ * @text 行间距
+ * @desc 每一行文字之间的额外垂直距离。
+ * @type number
+ * @default 6
  * 
  * @param fontColorDesc
  * @text 字体颜色: 任务描述
@@ -705,7 +717,7 @@
     function parseColor(input) {
         if (!input) return "#000000";
         input = String(input).trim();
-        
+
         // 如果是纯数字，视为系统色号
         if (/^\d+$/.test(input)) {
             if (ColorManager._windowskin) {
@@ -723,7 +735,7 @@
     // ===================================
     function compileCondition(codeStr) {
         if (!codeStr || codeStr.trim() === "") return "";
-        
+
         let script = codeStr;
         // 1. 替换逻辑运算符 (防止与位运算混淆，先替换)
         // 将单个 & 替换为 &&, 单个 | 替换为 || (排除已经是 && 或 || 的情况)
@@ -768,13 +780,14 @@
         width: Number(PARAMS['hudWidth'] || 320),
         maxRunningQuests: Number(PARAMS['maxRunningQuests'] || 5),
         itemPadding: Number(PARAMS['itemPadding'] || 8),
+        taskSpacing: Number(PARAMS['taskSpacing'] || 10),
         sectionSpacing: Number(PARAMS['sectionSpacing'] || 24),
-        
+
         showBg: PARAMS['showListBackground'] === 'true',
         bgColor: PARAMS['listBackgroundColor'] || 'rgba(0,0,0,0.5)',
         headerBgColor: PARAMS['headerBackgroundColor'] || 'rgba(0,0,0,0.6)',
         borderRadius: Number(PARAMS['borderRadius'] || 8),
-        
+
         outlineWidth: Number(PARAMS['fontOutlineWidth'] || 3),
         shadowDist: Number(PARAMS['fontShadowDistance'] || 1),
         outlineColor: PARAMS['fontOutlineColor'] || '#000000',
@@ -784,6 +797,7 @@
         fontSizeGroup: Number(PARAMS['fontSizeGroup'] || 16),
         fontSizeTitle: Number(PARAMS['fontSizeTitle'] || 15),
         fontSizeReward: Number(PARAMS['fontSizeReward'] || 14),
+        lineSpacing: Number(PARAMS['lineSpacing'] || 6),
         colorReward: PARAMS['fontColorReward'] || 0,
         fontSizeDesc: Number(PARAMS['fontSizeDesc'] || 13),
         fontColorDesc: PARAMS['fontColorDesc'] || 'rgba(220, 220, 220, 0.9)',
@@ -800,7 +814,7 @@
         statusText: {
             0: { text: PARAMS['textRunning'], color: PARAMS['colorRunning'] },
             1: { text: PARAMS['textSuccess'], color: PARAMS['colorSuccess'] },
-            2: { text: PARAMS['textFail'],    color: PARAMS['colorFail'] },
+            2: { text: PARAMS['textFail'], color: PARAMS['colorFail'] },
         },
         categories: parseStructList(PARAMS['categoryList']).sort((a, b) => Number(a.priority) - Number(b.priority)),
         templates: {}
@@ -811,7 +825,7 @@
     for (let i = 0; i < tempArr.length; i++) {
         const t = tempArr[i];
         let _desc = t.desc || '';
-        
+
         // --- [修改开始]：预编译 Condition ---
         let _condFunc = null;
         const rawCond = t.condition ? t.condition.trim() : "";
@@ -834,11 +848,11 @@
             conditionFunc: _condFunc,
             desc: _desc || "",
             rewardText: t.rewardText,
-            
+
             seAccept: t.seAccept || CONFIG.globalSe.accept,
             seSuccess: t.seSuccess || CONFIG.globalSe.success,
             seFail: t.seFail || CONFIG.globalSe.fail,
-            
+
             ceAccept: Number(t.ceAccept || 0),
             ceSuccess: Number(t.ceSuccess || 0),
             ceFail: Number(t.ceFail || 0),
@@ -847,17 +861,17 @@
             onSuccess: t.onSuccess || "",
             onFail: t.onFail || "",
             onComplete: t.onComplete || "",
-            
+
             // --- [修改开始]：预编译 Monitor Code ---
             // 这里只存储转换后的字符串，具体生成函数在 getMonitorFunc 中进行
-            monitorCode: compileCondition(t.monitorCode || "") 
+            monitorCode: compileCondition(t.monitorCode || "")
             // --- [修改结束] ---
         };
     }
 
     const Q_STATUS = {
         RUNNING: 0,
-        SUCCESS: 1, 
+        SUCCESS: 1,
         FAIL: 2
     };
 
@@ -920,8 +934,8 @@
                 desc: template.desc,
                 status: Q_STATUS.RUNNING,
                 isCompleted: false,
-                progress: 0, 
-                maxProgress: template.maxProgress, 
+                progress: 0,
+                maxProgress: template.maxProgress,
                 timestamp: Date.now()
             };
 
@@ -929,7 +943,7 @@
             playSe(template.seAccept);
             reserveCommonEvent(template.ceAccept);
             this._evalCode(template.onAccept, instance);
-            
+
             return uuid;
         },
 
@@ -945,7 +959,7 @@
             }
 
             const template = CONFIG.templates[instance.templateId];
-            
+
             if (status === Q_STATUS.SUCCESS) playSe(template.seSuccess);
             else if (status === Q_STATUS.FAIL) playSe(template.seFail);
 
@@ -955,7 +969,7 @@
                 if (status === Q_STATUS.SUCCESS) {
                     reserveCommonEvent(template.ceSuccess);
                     this._evalCode(template.onSuccess, instance);
-                } 
+                }
                 else if (status === Q_STATUS.FAIL) {
                     reserveCommonEvent(template.ceFail);
                     this._evalCode(template.onFail, instance);
@@ -987,7 +1001,7 @@
             if (instance.progress >= instance.maxProgress && instance.status === Q_STATUS.RUNNING) {
                 this.setStatusByUuid(instance.uuid, Q_STATUS.SUCCESS);
             } else {
-                $gameSystem.requestHudRefresh(); 
+                $gameSystem.requestHudRefresh();
             }
         },
 
@@ -1003,7 +1017,7 @@
             }
             instance.isCompleted = !!isCompleted;
             $gameSystem.requestHudRefresh();
-            
+
             // 归档时触发完成事件
             if (isCompleted) {
                 const template = CONFIG.templates[instance.templateId];
@@ -1058,7 +1072,7 @@
          */
         _checkBatch(ids, checkFn, excludeHidden) {
             const list = Array.isArray(ids) ? ids : [ids];
-            
+
             // AND 逻辑：必须所有任务都满足
             for (const id of list) {
                 const instance = $gameSystem.getLatestInstance(id);
@@ -1096,7 +1110,7 @@
                 if (Array.isArray(arg)) ids.push(...arg);
                 else ids.push(arg);
             }
-            
+
             // 如果没传任何ID，Every默认为true(空集全真)，Some默认为false。
             // 但在业务逻辑中，没传ID通常视为“无匹配”，这里统一返回 false 防止逻辑漏洞。
             if (ids.length === 0) return false;
@@ -1104,7 +1118,7 @@
             const checkItem = (id) => {
                 const _id = '' + (id || '');
                 const instance = $gameSystem.getLatestInstance(_id);
-                
+
                 // 条件1：实例必须存在
                 if (!instance) return false;
                 // 条件2：必须未归档 (用户需求：不包含已完成任务)
@@ -1245,7 +1259,7 @@
             let count = 0;
             const allQuests = $gameSystem.getAllQuests();
             if (!allQuests) return 0;
-            
+
             for (let i = 0; i < allQuests.length; i++) {
                 if (allQuests[i].templateId === templateId) {
                     count++;
@@ -1258,7 +1272,7 @@
 
         _evalCode(code, questInstance) {
             if (!code || code.trim() === "") return;
-            const quest = questInstance; 
+            const quest = questInstance;
             try {
                 eval(code);
             } catch (e) {
@@ -1275,14 +1289,14 @@
     const _monitorFuncCache = {};
     function getMonitorFunc(templateId) {
         if (_monitorFuncCache[templateId]) return _monitorFuncCache[templateId];
-        
+
         const tpl = CONFIG.templates[templateId];
         if (!tpl || !tpl.monitorCode) return null; // 注意：此时 monitorCode 已经是转换后的 JS 代码
-        
+
         try {
             // 为了支持简写（如直接写 "V1" 而不写 return），我们尝试智能判断
             let codeBody = tpl.monitorCode.trim();
-            
+
             // 如果代码里包含 return，说明用户写了完整逻辑，直接用
             // 如果没有 return，且代码仅仅是一个变量或简单表达式，我们帮他补上 return
             if (codeBody.indexOf('return') === -1) {
@@ -1298,19 +1312,19 @@
     }
 
     const _Game_System_update = Game_System.prototype.update;
-    Game_System.prototype.update = function() {
+    Game_System.prototype.update = function () {
         _Game_System_update.call(this);
         this.updateQuestMonitor(); // 注入每帧检测
     };
-    
-    Game_System.prototype.updateQuestMonitor = function() {
+
+    Game_System.prototype.updateQuestMonitor = function () {
         // 每15帧执行一次，降低性能消耗
         if (Graphics.frameCount % 15 !== 0) return;
         if (!this._questInstances) return;
         for (let i = 0; i < this._questInstances.length; i++) {
             const instance = this._questInstances[i];
             // 只监控正在进行中的任务
-            if (instance.status !== 0) continue; 
+            if (instance.status !== 0) continue;
             const func = getMonitorFunc(instance.templateId);
             if (!func) continue;
             try {
@@ -1340,7 +1354,7 @@
     const _Game_System_initialize = Game_System.prototype.initialize;
     Game_System.prototype.initialize = function () {
         _Game_System_initialize.call(this);
-        this._questInstances = []; 
+        this._questInstances = [];
         this._questHudVisible = true;
         this._questHudDirty = true;
     };
@@ -1384,7 +1398,7 @@
             if (!tpl) return true;
             // 如果没有配置条件，默认是显示的
             if (!tpl.conditionFunc) return true;
-            
+
             try {
                 // 执行条件函数，返回 truthy 则保留，falsy 则过滤
                 return tpl.conditionFunc.call(window);
@@ -1425,7 +1439,7 @@
         }
         for (let i = 0; i < this._questInstances.length; i++) {
             const q = this._questInstances[i];
-            
+
             // 核心修改：如果已归档(Completed)，则不在HUD显示
             if (q.isCompleted) continue;
             if (groups[q.typeId]) {
@@ -1450,8 +1464,70 @@
             super();
             this.createBitmap();
             this._checkTimer = 0;
-            this._lastVisibleState = ""; 
+            this._lastVisibleState = "";
             this.opacity = 255;
+        }
+
+        /** 
+         * [新增] 核心绘制器：支持 \C[n] 颜色代码
+         * @param {string} text - 要绘制的文本
+         * @param {number} x - X坐标
+         * @param {number} y - Y坐标
+         * @param {number} maxWidth - 最大宽度(仅用于截断，不做自动换行)
+         * @param {boolean} dryRun - 如果为true，只计算宽度不绘制
+         * @returns {number} 绘制的总宽度
+         */
+        drawTextWithCodes(text, x, y, maxWidth, dryRun = false) {
+            if (!text) return 0;
+
+            // 匹配 \C[n] 正则
+            const reg = /\\C\[(\d+)\]/gi;
+            const blocks = text.split(reg);
+
+            let currentX = x;
+            let originalColor = this.bitmap.textColor; // 记住初始颜色
+            // split 之后，数组格式通常是: [text, colorId, text, colorId, ...]
+            // 比如 "A\C[2]B" -> ["A", "2", "B"]
+
+            for (let i = 0; i < blocks.length; i++) {
+                const block = blocks[i];
+
+                // 如果是颜色ID位置 (奇数索引，因为 split 的捕获组特性)
+                if (i % 2 === 1) {
+                    if (!dryRun) {
+                        this.bitmap.textColor = ColorManager.textColor(Number(block));
+                    }
+                } else {
+                    // 如果是文本内容
+                    if (block.length > 0) {
+                        const w = this.bitmap.measureTextWidth(block);
+                        // 检查是否超出最大宽度 (简单的裁剪逻辑)
+                        if (currentX + w > x + maxWidth) {
+                            // 空间不足，只画能画下的部分 (这里简化处理，直接缩放或画部分)
+                            // 为了保持RPG Maker风格，这里允许稍微压缩绘制，或者直接画满为止
+                            if (!dryRun) this.bitmap.drawText(block, currentX, y, maxWidth - (currentX - x), this.bitmap.fontSize + 4, "left");
+                            currentX += w;
+                            break;
+                        } else {
+                            if (!dryRun) this.bitmap.drawText(block, currentX, y, w, this.bitmap.fontSize + 4, "left");
+                            currentX += w;
+                        }
+                    }
+                }
+            }
+
+            // 恢复颜色
+            if (!dryRun) this.bitmap.textColor = originalColor;
+            return currentX - x;
+        }
+
+        /** 
+         * [替换] 纯文本计算宽度 (去除 \C[n] 后计算真实宽度)
+         */
+        measureRealWidth(text) {
+            // 先去掉颜色代码再计算宽度
+            const cleanText = text.replace(/\\C\[(\d+)\]/gi, "");
+            return this.bitmap.measureTextWidth(cleanText);
         }
 
         createBitmap() {
@@ -1535,7 +1611,7 @@
                     // 检测: 只要地图名窗口正在开着，或者还没完全关掉
                     if (win.openness > 0 && win.contentsOpacity > 0) {
                         shouldFade = true;
-                    } 
+                    }
                     // 补充检测：MZ内部地图名计时器
                     else if ($gameMap._mapNameDuration > 0) {
                         shouldFade = true;
@@ -1555,14 +1631,14 @@
                 if (this.opacity > target) this.opacity = target;
             }
         }
-        
+
         checkVisibilityCondition() {
             const quests = $gameSystem._questInstances;
             let currentVisibleState = "";
             for (let i = 0; i < quests.length; i++) {
                 const q = quests[i];
-                if (q.isCompleted) continue; 
-                
+                if (q.isCompleted) continue;
+
                 const tpl = CONFIG.templates[q.templateId];
                 let isVisible = true;
 
@@ -1570,16 +1646,16 @@
                     try {
                         isVisible = tpl.conditionFunc.call(window);
                     } catch (e) {
-                        isVisible = true; 
+                        isVisible = true;
                     }
                 }
-                
+
                 currentVisibleState += q.uuid + ":" + (isVisible ? "1" : "0") + "|";
             }
 
             if (this._lastVisibleState !== currentVisibleState) {
                 this._lastVisibleState = currentVisibleState;
-                $gameSystem.requestHudRefresh(); 
+                $gameSystem.requestHudRefresh();
             }
         }
 
@@ -1588,9 +1664,9 @@
 
             // 新增：应用全局描边/阴影颜色配置
             this.bitmap.outlineColor = CONFIG.outlineColor;
-            
+
             if (CONFIG.shadowDist > 0) {
-                this.bitmap.context.shadowColor = CONFIG.outlineColor; 
+                this.bitmap.context.shadowColor = CONFIG.outlineColor;
                 this.bitmap.context.shadowBlur = 4;
                 this.bitmap.context.shadowOffsetX = CONFIG.shadowDist;
                 this.bitmap.context.shadowOffsetY = CONFIG.shadowDist;
@@ -1602,7 +1678,7 @@
 
             const layoutInfo = [];
             let nonEmptyGroups = 0;
-            
+
             // --- 第一阶段：计算布局和总高度 ---
             let currentTempY = CONFIG.y + CONFIG.itemPadding;
 
@@ -1615,7 +1691,7 @@
                     const tpl = CONFIG.templates[q.templateId];
                     if (tpl) {
                         if (tpl.conditionFunc) {
-                            try { return tpl.conditionFunc.call(window); } 
+                            try { return tpl.conditionFunc.call(window); }
                             catch (e) { return true; }
                         }
                     }
@@ -1625,12 +1701,12 @@
                 if (visibleItems.length === 0) continue;
 
                 const groupStartY = currentTempY;
-                
+
                 let groupHeight = 32;
                 for (let i = 0; i < visibleItems.length; i++) {
                     const item = visibleItems[i];
                     const h = this.drawTaskItem(item, 0, 0, CONFIG.width - CONFIG.itemPadding * 2, true);
-                    groupHeight += h + CONFIG.itemPadding;
+                    groupHeight += h + CONFIG.taskSpacing;
                 }
 
                 layoutInfo.push({
@@ -1639,11 +1715,11 @@
                     y: groupStartY,
                     h: groupHeight
                 });
-                
+
                 nonEmptyGroups++;
                 currentTempY += groupHeight + CONFIG.sectionSpacing;
             }
-            
+
             // 记录真实内容高度，供鼠标检测使用
             this._contentHeight = currentTempY - CONFIG.y;
 
@@ -1657,11 +1733,11 @@
             // --- 第二阶段：绘制背景 (含修改1：渐变背景) ---
             if (CONFIG.showBg) {
                 this.drawRoundedRect(
-                    CONFIG.x, 
-                    CONFIG.y, 
-                    CONFIG.width, 
-                    totalContentHeight - CONFIG.y, 
-                    CONFIG.borderRadius, 
+                    CONFIG.x,
+                    CONFIG.y,
+                    CONFIG.width,
+                    totalContentHeight - CONFIG.y,
+                    CONFIG.borderRadius,
                     parseColor(CONFIG.bgColor)
                 );
             }
@@ -1680,7 +1756,7 @@
                 for (let o = 0; o < layout.items.length; o++) {
                     const item = layout.items[o];
                     const itemH = this.drawTaskItem(item, dx, dy, dw, false);
-                    dy += itemH + CONFIG.itemPadding;
+                    dy += itemH + CONFIG.taskSpacing;
                 }
             }
         }
@@ -1690,7 +1766,7 @@
             const ctx = this.bitmap.context;
             ctx.save();
             ctx.beginPath();
-            
+
             // 绘制圆角路径
             ctx.moveTo(x + r, y);
             ctx.lineTo(x + w - r, y);
@@ -1705,12 +1781,12 @@
             // --- 修改开始：创建渐变填充 ---
             // 创建从左(x)到右(x+w)的线性渐变
             const gradient = ctx.createLinearGradient(x, y, x + w, y);
-            
+
             // 起始点：使用设定颜色
             gradient.addColorStop(0, color);
-            
+
             // 稍微靠右的位置保持一定可见度，防止文字看不清
-            gradient.addColorStop(0.3, color); 
+            gradient.addColorStop(0.3, color);
             // 终点：完全透明
             // 注意：这里简单处理为透明。如果color是rgba格式，最好提取rgb值，
             // 但为了兼容性，设为完全透明的任意颜色即可，Canvas会自动处理过渡。
@@ -1732,11 +1808,11 @@
             this.bitmap.fontSize = CONFIG.fontSizeGroup;
             this.bitmap.outlineWidth = CONFIG.outlineWidth;
             this.bitmap.textColor = parseColor(meta.color);
-            
+
             if (CONFIG.shadowDist > 0) {
                 this.bitmap.context.shadowColor = "rgba(0,0,0,0.8)";
             }
-            
+
             this.bitmap.drawText(meta.name, x + 12, y + 2, fullWidth - 24, 24, "left");
             this.bitmap.fontBold = false;
         }
@@ -1744,9 +1820,9 @@
         processText(text, instance) {
             if (!text) return "";
             return TranslateUtils.getText(text).replace(/{current}/g, instance.progress)
-                       .replace(/{max}/g, instance.maxProgress)
-                       .replace(/{remain}/g, instance.maxProgress - instance.progress)
-                       .replace(/{percent}/g, Math.floor(instance.progress / instance.maxProgress * 100));
+                .replace(/{max}/g, instance.maxProgress)
+                .replace(/{remain}/g, instance.maxProgress - instance.progress)
+                .replace(/{percent}/g, Math.floor(instance.progress / instance.maxProgress * 100));
         }
 
         drawTaskItem(instance, x, y, width, dryRun = false) {
@@ -1754,13 +1830,19 @@
             let cy = y;
             const statusConf = CONFIG.statusText[instance.status] || { text: "", color: 0 };
             const isFailed = (instance.status === 2); // 状态2为失败
-            
+
             // 处理文本中的占位符
             let displayTitle = this.processText(instance.title, instance);
             if (typeof TranslateUtils !== 'undefined') {
                 displayTitle = TranslateUtils.getText(displayTitle);
             }
             
+            // 标题行高 = 字体大小 + 4像素缓冲
+            const titleLineHeight = CONFIG.fontSizeTitle + CONFIG.lineSpacing;
+
+            // 描述行高 = 字体大小 + 4像素缓冲
+            const descLineHeight = CONFIG.fontSizeDesc + CONFIG.lineSpacing;
+
             const rewardText = CONFIG.templates[instance.templateId].rewardText;
 
             // 1. 绘制状态前缀
@@ -1772,27 +1854,27 @@
             if (typeof TranslateUtils !== 'undefined') {
                 statusText = TranslateUtils.getText(statusText);
             }
-            
+
             const statusWidth = this.bitmap.measureTextWidth(statusText);
-            
+
             if (!dryRun) {
                 this.bitmap.textColor = parseColor(statusConf.color);
-                this.bitmap.drawText(statusText, x, cy, width, 24, "left");
+                this.bitmap.drawText(statusText, x, cy, width, titleLineHeight, "left");
             }
 
-            const titleFirstLineX = x + statusWidth; 
-            const titleMaxW_First = width - statusWidth; 
+            const titleFirstLineX = x + statusWidth;
+            const titleMaxW_First = width - statusWidth;
             const titleMaxW_Other = width;
-            
+
             this.bitmap.textColor = isFailed ? parseColor(8) : ColorManager.normalColor();
 
             const fullTitleLines = [];
-            
+
             if (isEnglish) {
                 const words = displayTitle.split(" ");
                 let currentLine = "";
                 let isFirstLine = true;
-                
+
                 for (let i = 0; i < words.length; i++) {
                     const word = words[i];
                     const testLine = currentLine + (currentLine.length > 0 ? " " : "") + word;
@@ -1840,11 +1922,11 @@
 
             for (let i = 0; i < fullTitleLines.length; i++) {
                 const lineStr = fullTitleLines[i];
-                const drawX = (i === 0) ? titleFirstLineX : x; 
+                const drawX = (i === 0) ? titleFirstLineX : x;
                 const drawW = (i === 0) ? titleMaxW_First : titleMaxW_Other;
 
                 if (!dryRun) {
-                    this.bitmap.drawText(lineStr, drawX, cy, drawW, 24, "left");
+                    this.bitmap.drawText(lineStr, drawX, cy, drawW, titleLineHeight, "left");
 
                     if (isFailed) {
                         const lineWidth = this.bitmap.measureTextWidth(lineStr);
@@ -1852,88 +1934,111 @@
                         ctx.save();
                         ctx.strokeStyle = this.bitmap.textColor;
                         ctx.lineWidth = 2;
-                        ctx.shadowColor = "transparent"; 
+                        ctx.shadowColor = "transparent";
                         ctx.beginPath();
-                        const lineY = cy + 12; 
+                        const lineY = cy + 12;
                         ctx.moveTo(drawX, lineY);
                         ctx.lineTo(drawX + lineWidth, lineY);
                         ctx.stroke();
                         ctx.restore();
                     }
                 }
-                
+
                 if (i === fullTitleLines.length - 1 && rewardText) {
                     if (!dryRun) {
                         this.bitmap.fontSize = CONFIG.fontSizeReward;
                         this.bitmap.textColor = parseColor(CONFIG.colorReward);
-                        this.bitmap.drawText(rewardText, x, cy + 2, width, 24, "right");
+                        this.bitmap.drawText(rewardText, x, cy + 2, width, titleLineHeight, "right");
                         this.bitmap.fontSize = CONFIG.fontSizeTitle;
                     }
                 }
-                cy += 24; 
+                cy += 24;
             }
+
+            cy += CONFIG.lineSpacing;
 
             if (instance.desc) {
                 this.bitmap.fontSize = CONFIG.fontSizeDesc;
                 this.bitmap.textColor = parseColor(CONFIG.fontColorDesc);
-                
+
                 let processDesc = this.processText(instance.desc, instance);
                 if (typeof TranslateUtils !== 'undefined') {
                     processDesc = TranslateUtils.getText(processDesc);
                 }
 
                 const descLines = processDesc.split('\n');
-                
+
                 for (let l = 0; l < descLines.length; l++) {
                     const rawLine = descLines[l];
                     const wrappedDescLines = this.wrapText(rawLine, width - 10);
-                    
+
                     for (let wl = 0; wl < wrappedDescLines.length; wl++) {
                         if (!dryRun) {
-                            this.bitmap.drawText(wrappedDescLines[wl], x + 10, cy, width - 10, 20, "left");
+                            this.bitmap.drawText(wrappedDescLines[wl], x + 10, cy, width - 10, descLineHeight, "left");
                         }
-                        cy += 20;
+                        cy += descLineHeight;
                     }
                 }
             }
-            return cy - y; 
+            return cy - y;
         }
 
+        /**
+         * [替换] 自动换行逻辑 (加强版，支持忽略颜色代码计算长度)
+         */
         wrapText(text, maxWidth) {
             if (!text) return [];
-            const isEnglish = (typeof TranslateUtils !== 'undefined' && TranslateUtils.currentLanguage === "en-US");
 
-            let lines = [];
-            if (isEnglish) {
-                const words = text.split(" ");
-                let currentLine = words[0];
-                for (let i = 1; i < words.length; i++) {
-                    const word = words[i];
-                    const testLine = currentLine + " " + word;
-                    const width = this.bitmap.measureTextWidth(testLine);
-                    if (width < maxWidth) {
-                        currentLine = testLine;
-                    } else {
-                        lines.push(currentLine);
-                        currentLine = word;
-                    }
+            // 分割符处理：英文按空格，中文按字
+            // 为了不打断 \C[n]，我们需要更小心的遍历
+
+            const lines = [];
+            let currentLine = "";
+
+            // 简单处理：将字符串打散为字符，但遇到 \ 且后面是 C[n] 时作为整体处理
+            // 这是一个简化的 parser，为了性能不写太复杂的词法分析
+
+            // 预处理：先把 \C[n] 提取保护起来，或者逐字扫描
+            const tokens = [];
+            const reg = /(\\C\[\d+\])/gi;
+            const parts = text.split(reg);
+
+            for (let p of parts) {
+                if (reg.test(p)) {
+                    tokens.push({ type: 'code', val: p });
+                } else {
+                    // 普通文本，按字拆分（如果不希望英文单词被打断，这里需要额外判断）
+                    const chars = p.split("");
+                    for (let c of chars) tokens.push({ type: 'char', val: c });
                 }
-                lines.push(currentLine);
-            } else {
-                const chars = text.split(""); 
-                let currentLine = chars[0];
-                for (let i = 1; i < chars.length; i++) {
-                    const char = chars[i];
-                    const width = this.bitmap.measureTextWidth(currentLine + char);
-                    if (width < maxWidth) {
-                        currentLine += char;
-                    } else {
-                        lines.push(currentLine);
-                        currentLine = char;
-                    }
-                }
-                lines.push(currentLine);
             }
+            for (let k = 0; k < tokens.length; k++) {
+                const token = tokens[k];
+                const newVal = token.val;
+
+                // 试探加入
+                const testLine = currentLine + newVal;
+
+                // 计算宽度时必须剥离颜色代码
+                const testWidth = this.measureRealWidth(testLine);
+
+                if (testWidth <= maxWidth) {
+                    currentLine = testLine;
+                } else {
+                    // 如果单个颜色代码本身不占宽度，不用换行，但是这里为了简单直接推
+                    if (currentLine.length > 0) {
+                        lines.push(currentLine);
+                        // 新起一行，如果是控制符，直接放开头
+                        currentLine = newVal;
+                    } else {
+                        // 这一行一个字都放不下（极窄情况），强行放
+                        lines.push(newVal);
+                        currentLine = "";
+                    }
+                }
+            }
+            if (currentLine.length > 0) lines.push(currentLine);
+
             return lines;
         }
     }
@@ -1952,12 +2057,12 @@
         if (this._questHud) return;
         this._questHud = new Sprite_QuestHUD();
         this.addChild(this._questHud);
-        
+
         // --- 核心修复：在这里调用初始化设置 ---
         if (this._questHud.setupInitialOpacity) {
             this._questHud.setupInitialOpacity();
         }
-        
+
         $gameSystem.requestHudRefresh();
     };
 
