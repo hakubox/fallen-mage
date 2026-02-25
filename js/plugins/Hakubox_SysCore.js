@@ -847,6 +847,33 @@
   };
 
 
+  // 定义属性，默认值为 false
+  ConfigManager.blackNips = false;
+  // 扩展 makeData：保存设置时，把 blackNips 的值写入存档
+  const _ConfigManager_makeData = ConfigManager.makeData;
+  ConfigManager.makeData = function () {
+    const config = _ConfigManager_makeData.call(this);
+    config.blackNips = this.blackNips;
+    return config;
+  };
+  // 扩展 applyData：读取设置时，从存档恢复 blackNips 的值
+  const _ConfigManager_applyData = ConfigManager.applyData;
+  ConfigManager.applyData = function (config) {
+    _ConfigManager_applyData.call(this, config);
+    this.blackNips = this.readFlag(config, "blackNips", false); // 第三个参数是默认值，false
+  };
+  //=============================================================================
+  // 2. Window_Options 部分
+  //=============================================================================
+  // 扩展 addGeneralOptions：向选项窗口添加我们的新选项
+  // 你可以根据需要改到 addVolumeOptions 等其他分类，或者放在列表最上方
+  const _Window_Options_addGeneralOptions = Window_Options.prototype.addGeneralOptions;
+  Window_Options.prototype.addGeneralOptions = function () {
+    this.addCommand(TranslateUtils.getText("乳晕加深"), "blackNips");
+    _Window_Options_addGeneralOptions.call(this);
+  };
+
+
   if (Utils.RPGMAKER_NAME === "MZ") {
     PluginManager.registerCommand(PluginName, 'clearScene', function (args) {
       if (!DataManager.isClearScene(args.sceneId)) {
