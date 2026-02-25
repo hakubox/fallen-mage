@@ -264,8 +264,13 @@
         return true;
       }
 
-      // 3. 如果隐藏中，阻断一切输入
+      // 3. 如果隐藏中
       if (this._isMessageHiddenByToggle) {
+        if (Input.isTriggered('cancel') || Input.isTriggered('escape')) {
+          this.toggleMessageVisibility();
+          return true;
+        }
+        
         return true;
       }
     }

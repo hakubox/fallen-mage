@@ -780,7 +780,13 @@ Imported.Eli_MobileControls = true
         }
 
         setStyleToElements() {
-            this.imgs[0].addEventListener("load", this.onLoad.bind(this), { once: true })
+            const img = this.imgs[0];
+            // 关键修复：检查 complete 属性。如果缓存已加载，直接执行 onLoad
+            if (img.complete && img.naturalWidth !== 0) {
+                this.onLoad();
+            } else {
+                img.addEventListener("load", this.onLoad.bind(this), { once: true });
+            }
         }
 
         appendElements() {
@@ -1008,7 +1014,13 @@ Imported.Eli_MobileControls = true
         }
 
         setStyleToElements() {
-            this.imgs[0].addEventListener("load", this.onLoad.bind(this), { once: true })
+            const img = this.imgs[0];
+            // 关键修复：检查 complete 属性。如果缓存已加载，直接执行 onLoad
+            if (img.complete && img.naturalWidth !== 0) {
+                this.onLoad();
+            } else {
+                img.addEventListener("load", this.onLoad.bind(this), { once: true });
+            }
         }
 
         appendElements() {
@@ -1226,7 +1238,13 @@ Imported.Eli_MobileControls = true
         }
 
         setStyleToElements() {
-            this.imgs[0].addEventListener("load", this.onLoad.bind(this), { once: true })
+            const img = this.imgs[0];
+            // 关键修复：检查 complete 属性。如果缓存已加载，直接执行 onLoad
+            if (img.complete && img.naturalWidth !== 0) {
+                this.onLoad();
+            } else {
+                img.addEventListener("load", this.onLoad.bind(this), { once: true });
+            }
         }
 
         appendElements() {
@@ -1508,23 +1526,50 @@ Imported.Eli_MobileControls = true
         _wasAutoHidden: false, // 记录是否是由剧情导致的自动隐藏
         _tempShowForChoice: false,
 
-        initialize() { },
+        initialize() { 
+            // === 安卓 APK 修复核心：强制清除 ConfigManager 中的潜在污染 ===
+            // 某些 MZ 核心版本会保存触摸 UI 的开关状态，导致第二次启动默认关闭
+            ConfigManager.touchUI = true; 
+            
+            // 强制重置全局变量，防止 WebView 进程未杀死的残留
+            this.elements = [];
+            this.buttonList = [];
+            this.divContainer = null;
+            this.isHidingButtons = false; // 绝对强制为 false (显示状态)
+            
+            // 强制重新读取参数，不依赖缓存
+            const rawParams = PluginManager.parameters("EliMZ_MobileControls");
+            this.parameters = new Parameters(rawParams);
+            // 重新实例化控制器
+            this.dpad = new DpadController();
+            this.joystick = new JoystickController();
+            this.controlButton = new ControlButton();
+            // 强制确立控制按钮的状态
+            if (this.controlButton) {
+                this.controlButton.isHidingButtons = false;
+            }
+        },
 
         initPluginCommands() { },
 
         createHtmlElements() {
-            this.createDiv()
-            this.createDpad()
-
+            // 逻辑修复：确保列表是空的，防止重复推入导致逻辑错乱
+            this.elements = [];
+            this.buttonList = [];
+            // 重新初始化各控制器实例，确保它们绑定的是新的 DOM
+            this.joystick = new JoystickController();
+            this.dpad = new DpadController();
+            this.controlButton = new ControlButton();
+            // 重建 DIV 结构
+            this.createDiv();
+            this.createDpad();
             for (const parameters of this.param().buttons) {
-                this.createRegularButtons(parameters)
+                this.createRegularButtons(parameters);
             }
-
             if (this.param().controlButton.enable) {
-                this.createControlButtons()
+                this.createControlButtons();
             }
-
-            this.disableContextMenu()
+            this.disableContextMenu();
         },
 
         createDiv() {
@@ -1613,7 +1658,8 @@ Imported.Eli_MobileControls = true
         },
 
         addToDiv(element) {
-            this.getDiv().append(element)
+            element.style.pointerEvents = "auto"; // 关键：恢复按钮的可点击性
+            this.getDiv().append(element);
         },
 
         removeButtonsFromScene() {
@@ -1813,12 +1859,27 @@ Imported.Eli_MobileControls = true
         /* ------------------------------- SCENE BOOT ------------------------------- */
         {
 
-            Alias.Scene_Boot_create = Scene_Boot.prototype.create
-            Scene_Boot.prototype.create = function () {
-                Alias.Scene_Boot_create.call(this)
-                Plugin.createHtmlElements()
+            // 使用 start 钩子，并再次延时
+            Alias.Scene_Boot_start = Scene_Boot.prototype.start;
+            Scene_Boot.prototype.start = function () {
+                Alias.Scene_Boot_start.call(this);
+                
+                // 为什么要判断平台？因为只有安卓有这个问题
+                if (Utils.isMobileDevice()) {
+                     // 暴力延时 1000ms（1秒）。
+                     // 在安卓上，这 1 秒通常刚好覆盖掉 Config 读取 -> 画面淡入的过程
+                     setTimeout(() => {
+                         console.log("Eli Mobile: Android Force Init Start");
+                         // 再次强制重置状态
+                         Plugin.isHidingButtons = false;
+                         Plugin.createHtmlElements();
+                         Plugin.showButtons();
+                     }, 1000);
+                } else {
+                    // PC/Web 保持原样
+                    Plugin.createHtmlElements();
+                }
             }
-
         }
 
         /* ------------------------------- SCENE BASE ------------------------------- */
