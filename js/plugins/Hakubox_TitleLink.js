@@ -176,7 +176,7 @@
   document.addEventListener('mousemove', (e) => {
     if (!SceneManager._scene instanceof Scene_Title || !SceneManager._scene || !SceneManager._scene.links) return;
 
-    const _links = SceneManager._scene.links;    
+    const _links = SceneManager._scene.links;
     for (let i = 0; i < _links.length; i++) {
       const item = _links[i];
       if (!item.sprite) continue;
@@ -207,13 +207,24 @@
     }
   });
 
+  function openUrl(url) {
+    if (!url) return;
+
+    // 检测是否为 RPG Maker MV/MZ 的 PC 测试环境 或 NW.js 环境
+    if (Utils.isNwjs()) {
+      require('nw.gui').Shell.openExternal(url);
+    } else if (typeof cordova !== 'undefined' && cordova.InAppBrowser) {
+      // 针对 Cordova/PhoneGap 打包环境 (通常用于 APK)
+      cordova.InAppBrowser.open(url, '_system');
+    } else {
+      // 普通浏览器环境
+      window.open(url, '_blank');
+    }
+  }
+
   document.addEventListener('mousedown', (e) => {
-    if (_isMouseOver && _item) {
-      if (nw && nw.Shell) {
-        nw.Shell.openExternal(_item.url);
-      } else {
-        window.open(_item.url, '_blank');
-      }
+    if (_item) {
+      openUrl(_item.url);
     }
   });
 
