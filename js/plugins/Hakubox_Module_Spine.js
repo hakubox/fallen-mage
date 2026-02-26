@@ -383,6 +383,29 @@
  * @value dark,深色
  * @default normal,正常
  * 
+ * @command setSpineTexture
+ * @text 强制设置Spine贴图
+ * @desc 强制将某个Spine ID的贴图文件替换为指定图片。
+ * @arg id
+ * @text Spine ID
+ * @desc 需要修改的Spine ID (如 fern-tachie)
+ * @type text
+ * @default fern-tachie
+ * @arg textureName
+ * @text 图片文件名
+ * @desc 它是放在 /spine/ 目录下的图片全名 (如 fern-tachie-dark.png)
+ * @type text
+ * @default fern-tachie-dark.png
+ * 
+ * @command resetSpineTexture
+ * @text 恢复Spine默认贴图
+ * @desc 清除强制贴图设置，恢复使用 .atlas 文件中定义的默认图片。
+ * @arg id
+ * @text Spine ID
+ * @desc 需要恢复的Spine ID (如 fern-tachie)
+ * @type text
+ * @default fern-tachie
+ * 
  */
 
 /*~struct~SpineConfig:
@@ -533,29 +556,167 @@
   class SpineManager {
     static _cache = {};
     static _loaders = {};
-    static load(spineName) {
+
+    /** 强制设置 Spine 贴图 */
+    static setSpineTexture(spineId, newTexture) {
+      if (!spineId || !newTexture) return;
+      // 1. 初始化存储结构
+      if (!$gameData.spineTextureOverrides) {
+        $gameData.spineTextureOverrides = {};
+      }
+      // 2. 如果当前已经是这个图，就不重复操作了
+      if ($gameData.spineTextureOverrides[spineId] === newTexture) return;
+      // 3. 记录配置
+      $gameData.spineTextureOverrides[spineId] = newTexture;
+      // 4. 清理旧缓存 (非常重要，否则下次加载还会读到旧图)
+      SpineManager.clearCache(spineId);
+      // 5. 立即刷新当前场景中的 Spine (如果存在)
+      // 逻辑：销毁旧对象 -> 重新读取配置生成新对象
+      const scene = SceneManager._scene;
+      if (scene && typeof scene.createAndAddSpine === 'function') {
+        const activeSpine = activeSpines.get(spineId);
+        if (activeSpine) {
+          // 记录旧状态
+          const oldX = activeSpine.x;
+          const oldY = activeSpine.y;
+          const oldScale = activeSpine.scale.x;
+          const oldVisible = activeSpine.visible;
+          const parent = activeSpine.parent;
+
+          // 销毁旧实例
+          activeSpine.destroy();
+          activeSpines.delete(spineId);
+          // 获取原配置并重新加载
+          const config = spineConfigMap.get(spineId);
+          if (config) {
+            // 临时覆盖显示属性，以便无缝衔接
+            // 注意：createAndAddSpine 是异步的，可能有一瞬间闪烁
+            SceneManager._scene.createAndAddSpine(config);
+
+            // 由于 load 是异步过程，我们在 createAndAddSpine 里的 .then 中其实已经处理了位置等信息
+            // 但为了保险，如果需要保持运行时修改过的坐标，可能需要额外处理。
+            // 鉴于原 createAndAddSpine 会重置回 config 中的默认坐标，
+            // 如果需要保持比如 "moveSpine" 后的坐标，这里其实比较复杂。
+            // 简单起见，这里仅执行重载，坐标会重置回配置文件的默认值。
+          }
+        }
+      }
+    }
+    /** 恢复 Spine 默认贴图 */
+    static resetSpineTexture(spineId) {
+      if (!spineId) return;
+      if (!$gameData.spineTextureOverrides) return;
+      // 1. 删除配置
+      delete $gameData.spineTextureOverrides[spineId];
+      // 2. 清理缓存
+      SpineManager.clearCache(spineId);
+      // 3. 立即刷新 (同上)
+      const scene = SceneManager._scene;
+      if (scene && typeof scene.createAndAddSpine === 'function') {
+        const activeSpine = activeSpines.get(spineId);
+        if (activeSpine) {
+          activeSpine.destroy();
+          activeSpines.delete(spineId);
+          const config = spineConfigMap.get(spineId);
+          if (config) {
+            SceneManager._scene.createAndAddSpine(config);
+          }
+        }
+      }
+    }
+
+    /**
+     * 获取当前应该使用的图片后缀/文件名
+     * 现在改为检查 $gameData 中的动态配置
+     */
+    static _getTextureSuffix(spineName) {
+      if (typeof $gameData === 'undefined' || !$gameData.spineTextureOverrides) {
+        return null; // 没有配置或游戏未启动
+      }
+      return $gameData.spineTextureOverrides[spineName] || null;
+    }
+
+    /**
+     * 清理缓存 (当贴图改变时，必须清理)
+     * @param {string} spineName 
+     */
+    static clearCache(spineName) {
       const url = `spine/${spineName}.json`;
-      if (this._cache[url]) return Promise.resolve(new PIXI.spine.Spine(this._cache[url].spineData));
-      if (this._loaders[url]) return this._loaders[url];
-      this._loaders[url] = new Promise((resolve, reject) => {
+
+      // 清理主缓存 (包含所有可能的 texture 变体 key)
+      Object.keys(this._cache).forEach(key => {
+        if (key.startsWith(url)) {
+          delete this._cache[key];
+        }
+      });
+
+      // 清理加载器
+      Object.keys(this._loaders).forEach(key => {
+        if (key.startsWith(url)) {
+          delete this._loaders[key];
+        }
+      });
+    }
+    static load(spineName) {
+      const jsonUrl = `spine/${spineName}.json`; // 主数据文件
+      // 1. 生成唯一缓存Key
+      // 获取当前强制替换的图片名
+      const currentImg = this._getTextureSuffix(spineName);
+
+      // 如果有替换图，缓存key加上图片名；否则只用json路径
+      const cacheKey = currentImg ? `${jsonUrl}_${currentImg}` : jsonUrl;
+      if (this._cache[cacheKey]) {
+        return Promise.resolve(new PIXI.spine.Spine(this._cache[cacheKey].spineData));
+      }
+      if (this._loaders[cacheKey]) return this._loaders[cacheKey];
+
+      this._loaders[cacheKey] = new Promise((resolve, reject) => {
         const loader = new PIXI.Loader();
-        loader.add(url, url);
+
+        const metadata = {};
+        // 如果存在替换配置
+        if (currentImg) {
+          metadata.imageName = currentImg;
+          metadata.spineAtlasSuffix = ".atlas";
+        }
+        loader.add(jsonUrl, jsonUrl, { metadata });
+        // 添加一个中间件来篡改 Atlas 解析出的图片路径
+        loader.use((resource, next) => {
+          // 只有当加载的是 atlas 文本数据，且是我们指定的那个 Spine 时
+          if (resource.extension === 'atlas' && resource.url.includes(spineName)) {
+            // 检查配置
+            const targetImg = SpineManager._getTextureSuffix(spineName);
+            if (targetImg) {
+              // 正则替换 atlas 内容里的图片名
+              // Atlas 文件第一行或每块开头通常是图片文件名
+              // 这里的正则替换需要小心，只替换 .png 结尾的行
+              resource.data = resource.data.replace(/^[^\n]+\.png/gm, (match) => {
+                // 直接强制替换成指令设置的图片名
+                return targetImg;
+              });
+            }
+          }
+          next();
+        });
         loader.load((_, resources) => {
-          if (resources[url] && resources[url].spineData) {
-            this._cache[url] = resources[url];
-            delete this._loaders[url];
-            resolve(new PIXI.spine.Spine(resources[url].spineData));
+          const res = resources[jsonUrl];
+          if (res && res.spineData) {
+            this._cache[cacheKey] = res; // 存入带状态的 key
+            delete this._loaders[cacheKey];
+            resolve(new PIXI.spine.Spine(res.spineData));
           } else {
-            delete this._loaders[url];
-            reject(new Error(`Spine resource failed to load: ${url}`));
+            delete this._loaders[cacheKey];
+            console.error("Resources:", resources);
+            reject(new Error(`Spine resource failed to load: ${jsonUrl}`));
           }
         });
+
         loader.onError.add((error) => {
-          delete this._loaders[url];
+          delete this._loaders[cacheKey];
           reject(error);
         });
       });
-      return this._loaders[url];
+      return this._loaders[cacheKey];
     }
   }
   window.SpineManager = SpineManager;
@@ -650,8 +811,8 @@
     this._spineContainer._currentVal = 1.0;
     this._spineForegroundContainer = new PIXI.Container();
     this._spineBaseContainer.addChild(
-      this._spineBackgroundContainer, 
-      this._spineContainer, 
+      this._spineBackgroundContainer,
+      this._spineContainer,
       this._spineForegroundContainer
     );
   };
@@ -659,28 +820,28 @@
   const _Scene_Base_update = Scene_Base.prototype.update;
   Scene_Base.prototype.update = function () {
     _Scene_Base_update.call(this);
-    
+
     // 原有的补间动画逻辑
     if (this._spineTweenManager) {
       this._spineTweenManager.update();
     }
-    
+
     // 原有的可见性开关逻辑
     if (this._spineBaseContainer) {
       if (this._spineBaseContainer.visible !== $gameSwitches.value(defaultVisibleSwitchId)) {
         this._spineBaseContainer.visible = $gameSwitches.value(defaultVisibleSwitchId);
       }
-      
+
       // ———————————————— 新增：极简版变暗逻辑 ————————————————
       // 选择你要变色的容器：
       // this._spineContainer     = 只有立绘变黑（推荐）
       // this._spineBaseContainer = 连背景图层一起变黑
-      const targetContainer = this._spineContainer; 
+      const targetContainer = this._spineContainer;
       if (targetContainer && $gameSystem) {
         // B. 设定目标亮度
         // 逻辑：如果是菲伦说话，变暗(比如0.4)；否则恢复正常(1.0)
         const isCurrent = ($gameSystem._tachieVisible && (!$gameSystem._currentSpeaker || $gameSystem._currentSpeaker === '菲伦'));
-        const targetVal = isCurrent || !Hakubox_NPCTachie.hasCurrentSpeakerTachie() ? 1.0 : 0.4; 
+        const targetVal = isCurrent || !Hakubox_NPCTachie.hasCurrentSpeakerTachie() ? 1.0 : 0.4;
 
         // C. 平滑过渡 (每帧逼近目标值)
         const speed = 0.2; // 变化速度 (0.01~1.0)，越大越快
@@ -736,77 +897,77 @@
 
     // 2. 判断是否需要更新显示
     if ($gameData.haku_bg_info) {
-        // 该逻辑处理：如果在旧地图没显示（visible=false），到新地图也不显示。
-        // 如果在旧地图显示了（visible=true），到新地图自动切换背景。
-        if ($gameData.haku_bg_info.visible) {
-            // 如果找到了新的配置，且跟当前保存的图片不一致（或单纯为了刷新位置），应用它
-            if (matchedBgConfig) {
-                 $gameData.haku_bg_info = {
-                     imageFile: matchedBgConfig.imageFile,
-                     x: Number(matchedBgConfig.x || 0),
-                     y: Number(matchedBgConfig.y || 0),
-                     width: Number(matchedBgConfig.width || 0),
-                     height: Number(matchedBgConfig.height || 0),
-                     visible: true
-                 };
-            }
-            // 无论是沿用旧背景还是切换了新背景，只要 visible 是 true，就执行加载
-            this.createAndAddLayerImage(this._spineBackgroundContainer, $gameData.haku_bg_info);
-        }
-    } else {
-        // 如果从未手动操作过（$gameData.haku_bg_info 为空），完全走配置
-        // 这种情况通常是第一次进入游戏，或者还没用过背景功能
+      // 该逻辑处理：如果在旧地图没显示（visible=false），到新地图也不显示。
+      // 如果在旧地图显示了（visible=true），到新地图自动切换背景。
+      if ($gameData.haku_bg_info.visible) {
+        // 如果找到了新的配置，且跟当前保存的图片不一致（或单纯为了刷新位置），应用它
         if (matchedBgConfig) {
-            $gameData.haku_bg_info = {
-                imageFile: matchedBgConfig.imageFile,
-                x: Number(matchedBgConfig.x || 0),
-                y: Number(matchedBgConfig.y || 0),
-                width: Number(matchedBgConfig.width || 0),
-                height: Number(matchedBgConfig.height || 0),
-                visible: true 
-            };
-            this.createAndAddLayerImage(this._spineBackgroundContainer, $gameData.haku_bg_info);
+          $gameData.haku_bg_info = {
+            imageFile: matchedBgConfig.imageFile,
+            x: Number(matchedBgConfig.x || 0),
+            y: Number(matchedBgConfig.y || 0),
+            width: Number(matchedBgConfig.width || 0),
+            height: Number(matchedBgConfig.height || 0),
+            visible: true
+          };
         }
+        // 无论是沿用旧背景还是切换了新背景，只要 visible 是 true，就执行加载
+        this.createAndAddLayerImage(this._spineBackgroundContainer, $gameData.haku_bg_info);
+      }
+    } else {
+      // 如果从未手动操作过（$gameData.haku_bg_info 为空），完全走配置
+      // 这种情况通常是第一次进入游戏，或者还没用过背景功能
+      if (matchedBgConfig) {
+        $gameData.haku_bg_info = {
+          imageFile: matchedBgConfig.imageFile,
+          x: Number(matchedBgConfig.x || 0),
+          y: Number(matchedBgConfig.y || 0),
+          width: Number(matchedBgConfig.width || 0),
+          height: Number(matchedBgConfig.height || 0),
+          visible: true
+        };
+        this.createAndAddLayerImage(this._spineBackgroundContainer, $gameData.haku_bg_info);
+      }
     }
 
     // ———— 修改开始：FG 前景逻辑 (逻辑同背景) ————
     let matchedFgConfig = null;
     foregroundConfigs.some(config => {
-        if (config.scenes.includes(sceneName)) {
-            if (!config.maps || config.maps.length === 0 || config.maps.includes(currentMapId)) {
-                matchedFgConfig = config;
-                return true;
-            }
+      if (config.scenes.includes(sceneName)) {
+        if (!config.maps || config.maps.length === 0 || config.maps.includes(currentMapId)) {
+          matchedFgConfig = config;
+          return true;
         }
-        return false;
+      }
+      return false;
     });
 
     if ($gameData.haku_fg_info) {
-        if ($gameData.haku_fg_info.visible) {
-             if (matchedFgConfig) {
-                 $gameData.haku_fg_info = {
-                     imageFile: matchedFgConfig.imageFile,
-                     x: Number(matchedFgConfig.x || 0),
-                     y: Number(matchedFgConfig.y || 0),
-                     width: Number(matchedFgConfig.width || 0),
-                     height: Number(matchedFgConfig.height || 0),
-                     visible: true
-                 };
-             }
-            this.createAndAddLayerImage(this._spineForegroundContainer, $gameData.haku_fg_info);
-        }
-    } else {
+      if ($gameData.haku_fg_info.visible) {
         if (matchedFgConfig) {
-            $gameData.haku_fg_info = {
-                imageFile: matchedFgConfig.imageFile,
-                x: Number(matchedFgConfig.x || 0),
-                y: Number(matchedFgConfig.y || 0),
-                width: Number(matchedFgConfig.width || 0),
-                height: Number(matchedFgConfig.height || 0),
-                visible: true
-            };
-            this.createAndAddLayerImage(this._spineForegroundContainer, $gameData.haku_fg_info);
+          $gameData.haku_fg_info = {
+            imageFile: matchedFgConfig.imageFile,
+            x: Number(matchedFgConfig.x || 0),
+            y: Number(matchedFgConfig.y || 0),
+            width: Number(matchedFgConfig.width || 0),
+            height: Number(matchedFgConfig.height || 0),
+            visible: true
+          };
         }
+        this.createAndAddLayerImage(this._spineForegroundContainer, $gameData.haku_fg_info);
+      }
+    } else {
+      if (matchedFgConfig) {
+        $gameData.haku_fg_info = {
+          imageFile: matchedFgConfig.imageFile,
+          x: Number(matchedFgConfig.x || 0),
+          y: Number(matchedFgConfig.y || 0),
+          width: Number(matchedFgConfig.width || 0),
+          height: Number(matchedFgConfig.height || 0),
+          visible: true
+        };
+        this.createAndAddLayerImage(this._spineForegroundContainer, $gameData.haku_fg_info);
+      }
     }
   };
 
@@ -1015,7 +1176,7 @@
       // 关键改动：如果动画是非循环的，则添加一个一次性的完成监听器
       if (!_loop) {
         const config = spineConfigMap.get(id);
-        
+
         // 确保该Spine配置了有效的默认动画以供返回
         if (config && config.defaultAnimation) {
           // 'complete' 事件会在非循环动画播放完毕后触发
@@ -1091,7 +1252,7 @@
       if (faceEx) _skins.push(`face/${_faceEx}`);
 
       Utils_Spine.faceFaceSkin = _skins.join(',');
-      
+
       const _allSkins = Utils_Spine.getFernAllSkinsStr();
       Utils_Spine.setSkin(fernSpineId, _allSkins);
     }
@@ -1144,7 +1305,7 @@
           Utils_Spine.setFernAnime(Utils_Spine.fernAnime);
         }
       }
-      
+
       Utils_Spine.fernClothKey = cloth;
       Utils_Spine.fernClothSkin = _skins;
 
@@ -1157,7 +1318,7 @@
 
       $gameData.fern_tachie_sex = action;
       $gameData.fern_tachie_sex_color = color;
-      
+
       let _skins = '';
       let _colorIndex = ['normal', 'light', 'dark'].indexOf(color);
 
@@ -1451,6 +1612,21 @@
 
   PluginManager.registerCommand(PLUGIN_NAME, "hideForeground", () => {
     Utils_Spine.hideForeground();
+  });
+
+  // 强制设置 Spine 贴图
+  PluginManager.registerCommand(PLUGIN_NAME, "setSpineTexture", args => {
+    const spineId = args.id;
+    const newTexture = args.textureName;
+
+    SpineManager.setSpineTexture(spineId, newTexture);
+  });
+
+  // 恢复 Spine 默认贴图
+  PluginManager.registerCommand(PLUGIN_NAME, "resetSpineTexture", args => {
+    const spineId = args.id;
+
+    SpineManager.resetSpineTexture(spineId);
   });
 
 })();

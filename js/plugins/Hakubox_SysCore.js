@@ -846,7 +846,6 @@
     return rect;
   };
 
-
   // 定义属性，默认值为 false
   ConfigManager.blackNips = false;
   // 扩展 makeData：保存设置时，把 blackNips 的值写入存档
@@ -854,6 +853,13 @@
   ConfigManager.makeData = function () {
     const config = _ConfigManager_makeData.call(this);
     config.blackNips = this.blackNips;
+
+    if (this.blackNips && $gameSwitches.value(131)) {
+      SpineManager.setSpineTexture("fern-tachie", "fern-tachie-dark.png");
+    } else {
+      SpineManager.resetSpineTexture("fern-tachie");
+    }
+
     return config;
   };
   // 扩展 applyData：读取设置时，从存档恢复 blackNips 的值
