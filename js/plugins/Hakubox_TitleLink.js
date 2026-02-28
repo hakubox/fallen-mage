@@ -173,65 +173,102 @@
   let _isMouseOver = false;
   let _item = undefined;
 
-  document.addEventListener('mousemove', (e) => {
-    if (!SceneManager._scene instanceof Scene_Title || !SceneManager._scene || !SceneManager._scene.links) return;
-
-    const _links = SceneManager._scene.links;
-    for (let i = 0; i < _links.length; i++) {
-      const item = _links[i];
-      if (!item.sprite) continue;
-
-      if (
-        e.x >= item.x && e.x <= item.x + item.sprite.width &&
-        e.y >= item.y && e.y <= item.y + item.sprite.height
-      ) {
-        if (!SceneManager._scene.links[i].isHover) {
-          SoundManager.playCursor();
-        }
-
-        _isMouseOver = true;
-        SceneManager._scene.links[i].isHover = true;
-        _item = item;
-        if (item.sprite.bitmap.src !== item.hoverImageStr) {
-          item.sprite.bitmap = ImageManager.loadSystem(item.hoverImageStr);
-        }
-        break;
-      } else {
-        _isMouseOver = false;
-        SceneManager._scene.links[i].isHover = false;
-        _item = undefined;
-        if (item.sprite.bitmap.src !== item.imageStr) {
-          item.sprite.bitmap = ImageManager.loadSystem(item.imageStr);
-        }
-      }
-    }
-  });
-
+  // --- 新的 helper 函数 ---
   function openUrl(url) {
     if (!url) return;
 
-    // 检测是否为 RPG Maker MV/MZ 的 PC 测试环境 或 NW.js 环境
+    // 1. 针对 RPG Maker MZ 的 PC 测试 / NW.js 环境
     if (Utils.isNwjs()) {
       require('nw.gui').Shell.openExternal(url);
-    } else if (typeof cordova !== 'undefined' && cordova.InAppBrowser) {
-      // 针对 Cordova/PhoneGap 打包环境 (通常用于 APK)
+    }
+    // 2. 针对打包后的 Android/iOS APP (Cordova/PhoneGap 环境)
+    else if (typeof cordova !== 'undefined' && cordova.InAppBrowser) {
+      // 核心修改：使用 '_system' 参数强制调用系统默认浏览器
       cordova.InAppBrowser.open(url, '_system');
-    } else {
-      // 普通浏览器环境
-      window.open(url, '_blank');
+    }
+    // 3. 针对某些没有 InAppBrowser 插件但有 cordova 的环境 (通用备选)
+    else if (typeof cordova !== 'undefined' && navigator.app) {
+      navigator.app.loadUrl(url, { openExternal: true });
+    }
+    // 4. 针对普通 Web 浏览器 / 手机浏览器玩网页版
+    else {
+      // 尝试使用 window.open
+      const win = window.open(url, '_blank');
+      // 如果被拦截，尝试修改 location (不推荐，会覆盖游戏，但在某些手机浏览器是唯一办法)
+      if (!win) {
+        window.location.href = url;
+      }
     }
   }
 
-  document.addEventListener('mousedown', (e) => {
-    if (_item) {
-      openUrl(_item.url);
-    }
-  });
+  // --- 核心修复：挂载到 Scene_Title 的 update 循环中 ---
+  const Scene_Title_update = Scene_Title.prototype.update;
+  Scene_Title.prototype.update = function () {
+    Scene_Title_update.call(this);
 
-  document.addEventListener('mouseup', (e) => {
-    _isMouseOver = false;
-    _item = undefined;
-  });
+    // 每一帧都检测是否有点触发生
+    this.updateLinkTouch();
+  };
+
+  Scene_Title.prototype.updateLinkTouch = function () {
+    // 如果没有链接数据，直接跳过
+    if (!this.links || this.links.length === 0) return;
+
+    // 获取当前触摸/鼠标坐标 (TouchInput 自动统一了 PC 和 移动端)
+    const x = TouchInput.x;
+    const y = TouchInput.y;
+
+    // 检查是否刚刚被点击/触摸 (Triggered = 按下并释放的那一刻)
+    const isTriggered = TouchInput.isTriggered();
+
+    // 遍历所有链接
+    let isHoveringAny = false;
+
+    for (let i = 0; i < this.links.length; i++) {
+      const item = this.links[i];
+      if (!item.sprite) continue;
+
+      // 简单的矩形碰撞检测
+      // 注意：这里使用 sprite 的实际显示范围
+      const minX = item.sprite.x;
+      const maxX = item.sprite.x + item.sprite.width;
+      const minY = item.sprite.y;
+      const maxY = item.sprite.y + item.sprite.height;
+
+      if (x >= minX && x <= maxX && y >= minY && y <= maxY) {
+        isHoveringAny = true;
+
+        // 1. 处理高亮 (Hover) - 仅限非移动端或持续按压
+        if (!item.isHover) {
+          if (!Utils.isMobileDevice()) SoundManager.playCursor(); // 移动端通常不需要悬停音效
+          item.isHover = true;
+          if (item.hoverImageStr && item.sprite.bitmap) {
+            // 简单切换图片的方法
+            const newBitmap = ImageManager.loadSystem(item.hoverImageStr);
+            // 确保图片加载后再切换，避免闪烁
+            newBitmap.addLoadListener(() => {
+              item.sprite.bitmap = newBitmap;
+            });
+          }
+        }
+
+        // 2. 处理点击 (Click/Touch)
+        if (isTriggered) {
+          SoundManager.playOk(); // 播放确认音效
+          openUrl(item.url);
+        }
+
+      } else {
+        // 没有悬停/触摸该链接，恢复原样
+        if (item.isHover) {
+          item.isHover = false;
+          if (item.imageStr && item.sprite.bitmap) {
+            item.sprite.bitmap = ImageManager.loadSystem(item.imageStr);
+          }
+        }
+      }
+    }
+  };
 
   // const Scene_Title_update = Scene_Title.prototype.update;
   // Scene_Title.prototype.update = function () {
