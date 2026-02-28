@@ -213,179 +213,249 @@
  *
  * ============================================================================
  * 
- * @param ==== 核心数据配置 ====
+ * @param group1
+ * @text ==== 核心数据配置 ====
  *
  * @param categoryList
+ * @parent group1
  * @text 1. 任务分组配置
  * @type struct<Category>[]
  * @desc 定义任务的分组标签（如：主线、支线、委托）。
  * @default ["{\"id\":\"main\",\"name\":\"◆ 主线剧情\",\"color\":\"6\",\"priority\":\"1\"}","{\"id\":\"sub\",\"name\":\"◆ 支线任务\",\"color\":\"0\",\"priority\":\"2\"}"]
  *
  * @param questTemplates
+ * @parent group1
  * @text 2. 任务数据库
  * @type struct<QuestTemplate>[]
  * @desc 在这里录入所有的任务详情。
  * @default []
  *
- * @param ==== HUD 布局与外观 ====
+ * @param group2
+ * @text ==== HUD 布局与外观 ====
  *
  * @param hudX
+ * @parent group2
  * @text HUD X坐标
  * @type number
  * @default 10
  *
  * @param hudY
+ * @parent group2
  * @text HUD Y坐标
  * @type number
  * @default 10
  *
  * @param hudWidth
+ * @parent group2
  * @text HUD 总宽度
  * @type number
  * @default 320
+ * 
+ * @param maxHudHeight
+ * @parent group2
+ * @text HUD 最大高度
+ * @desc 限制列表内容显示的最大高度。设为0则不限制（自动适应内容）。
+ * @type number
+ * @default 0
  *
  * @param itemPadding
+ * @parent group2
  * @text 内容内边距
  * @desc 文字距离背景边缘的距离。
  * @type number
  * @default 8
  *
  * @param taskSpacing
+ * @parent group2
  * @text 任务间距
  * @desc 每一个任务条目之间的垂直距离。
  * @type number
  * @default 10
  *
  * @param sectionSpacing
+ * @parent group2
  * @text 分组间距
  * @desc “主线”组和“支线”组之间的垂直距离。
  * @type number
  * @default 24
  *
  * @param showListBackground
+ * @parent group2
  * @text 显示背景黑底
  * @type boolean
  * @default true
  * 
  * @param listBackgroundColor
+ * @parent group2
  * @text 背景颜色
  * @desc 系统色号"0-31" 或 Hex颜色"#FFFFFF" 或RGB/RGBA颜色"rgb(0,0,0,0)"。
  * @type string
  * @default rgba(0,0,0,0.5)
  *
  * @param borderRadius
+ * @parent group2
  * @text 背景圆角
  * @type number
  * @default 8
  *
  * @param headerBackgroundColor
+ * @parent group2
  * @text 分组标题背景色
  * @desc 系统色号"0-31" 或 Hex颜色"#FFFFFF" 或RGB/RGBA颜色"rgb(0,0,0,0)"。
  * @type string
  * @default rgba(0,0,0,0.6)
  *
- * @param ==== 文字样式 ====
+ * @param group3
+ * @text ==== 文字样式 ====
  * 
  * @param fontSizeGroup
+ * @parent group3
  * @text 字体大小: 分组标题
  * @type number
  * @default 16
  * 
  * @param fontSizeTitle
+ * @parent group3
  * @text 字体大小: 任务标题
  * @type number
  * @default 15
  * 
  * @param fontSizeDesc
+ * @parent group3
  * @text 字体大小: 任务描述
  * @type number
  * @default 13
  * 
  * @param fontSizeReward
+ * @parent group3
  * @text 字体大小: 奖励文本
  * @type number
  * @default 14
  * 
  * @param lineSpacing
+ * @parent group3
  * @text 行间距
  * @desc 每一行文字之间的额外垂直距离。
  * @type number
  * @default 6
  * 
  * @param fontColorDesc
+ * @parent group3
  * @text 字体颜色: 任务描述
  * @desc 系统色号"0-31" 或 Hex颜色"#FFFFFF" 或RGB/RGBA颜色"rgb(0,0,0,0)"。推荐使用rgba以降低不透明度，区分层级。
  * @type string
  * @default rgba(220,220,220,0.9)
  * 
  * @param fontColorReward
+ * @parent group3
  * @text 字体颜色: 奖励文本
  * @type number
  * @desc 输入系统色号(如 0~31)。
  * @default 0
  *
  * @param fontOutlineWidth
+ * @parent group3
  * @text 描边宽度
  * @type number
  * @default 3
  * 
  * @param fontOutlineColor
+ * @parent group3
  * @text 描边/阴影颜色
  * @desc 系统色号"0-31" 或 Hex颜色"#FFFFFF" 或RGB/RGBA颜色"rgb(0,0,0,0)"。
  * @type string
  * @default #000000
  *
  * @param fontShadowDistance
+ * @parent group3
  * @text 阴影距离
  * @desc 0为不显示阴影。
  * @type number
  * @default 1
  *
- * @param ==== 状态文本配置 ====
+ * @param hiddenHintText
+ * @parent group3
+ * @text 超出隐藏提示文字
+ * @desc 当内容超出高度时，底部显示的提示文字。
+ * @type string
+ * @default ... 更多任务已隐藏 ...
+ *
+ * @param hiddenHintColor
+ * @parent group3
+ * @text 提示文字颜色
+ * @desc 系统色号或Hex颜色。
+ * @type string
+ * @default #AAAAAA
+ *
+ * @param hiddenHintSize
+ * @parent group3
+ * @text 提示文字大小
+ * @type number
+ * @default 12
+ * 
+ * @param gradientHeight
+ * @parent group3
+ * @text 底部渐隐高度
+ * @desc 内容截断处底部渐变遮罩的高度（像素）。
+ * @type number
+ * @default 40
+ *
+ * 
+ * @param group4
+ * @text ==== 状态文本配置 ====
  *
  * @param textRunning
+ * @parent group4
  * @text [进行中] 前缀文本
  * @type string
  * @default 【进行中】
  *
  * @param colorRunning
+ * @parent group4
  * @text [进行中] 颜色
  * @desc 系统色号"0-31" 或 Hex颜色"#FFFFFF" 或RGB/RGBA颜色"rgb(0,0,0,0)"。
  * @type string
  * @default 0
  *
  * @param textSuccess
+ * @parent group4
  * @text [已完成] 前缀文本
  * @desc 任务目标达成，但在提交之前的状态。
  * @type string
  * @default 【已达标】
  *
  * @param colorSuccess
+ * @parent group4
  * @text [已完成] 颜色
  * @desc 系统色号"0-31" 或 Hex颜色"#FFFFFF" 或RGB/RGBA颜色"rgb(0,0,0,0)"。
  * @type string
  * @default 3
  *
  * @param textFail
+ * @parent group4
  * @text [失败] 前缀文本
  * @type string
  * @default 【已失败】
  *
  * @param colorFail
+ * @parent group4
  * @text [失败] 颜色
  * @desc 系统色号"0-31" 或 Hex颜色"#FFFFFF" 或RGB/RGBA颜色"rgb(0,0,0,0)"。
  * @type string
  * @default 10
  *
- * @param ==== 交互与动画 ====
+ * @param group5
+ * @text ==== 交互与动画 ====
  *
  * @param visibleSwitchId
+ * @parent group5
  * @text 全局显示开关ID
  * @desc 指定一个开关。开=允许显示，关=隐藏。设为0则始终允许显示。
  * @type switch
  * @default 0
  * 
  * @param hiddenOpacity
+ * @parent group5
  * @text 地图名遮挡时透明度
  * @desc 任务栏自动变半透明的透明度（0~255）
  * @type number
@@ -394,43 +464,101 @@
  * @default 50
  * 
  * @param enableMapNameOpacity
+ * @parent group5
  * @text 地图名遮挡优化
  * @desc 当左上角显示地图名时，任务栏自动变半透明。
  * @type boolean
  * @default true
  * 
  * @param enableMouseOpacity
+ * @parent group5
  * @text 鼠标/玩家悬停优化
  * @desc 当鼠标或玩家在任务栏区域时，自动变半透明。
  * @type boolean
  * @default true
  *
- * @param ==== 游戏逻辑限制 ====
+ * @param group6
+ * @text ==== 游戏逻辑限制 ====
  *
  * @param maxRunningQuests
+ * @parent group6
  * @text 最大同时接取数
  * @desc 玩家同时能进行的任务上限。-1为不限制。
  * @type number
  * @min -1
  * @default -1
+ * 
+ * 
+ * @param group7
+ * @text ==== 菜单界面配置 ====
+ * 
+ * @param menuSwitchId
+ * @parent group7
+ * @text 菜单显示开关ID
+ * @desc 指定一个开关。开=显示在菜单中，关=隐藏。设为0则始终显示。
+ * @type switch
+ * @default 0
+ * 
+ * @param menuLabel
+ * @parent group7
+ * @text 菜单显示名称
+ * @type string
+ * @default 任务记录
+ * 
+ * @param menuBackground
+ * @parent group7
+ * @text 菜单背景图片
+ * @desc 留空则使用默认模糊背景。图片放在 img/pictures/ 下。
+ * @type file
+ * @dir img/pictures/
+ * 
+ * @param menuTextConfig
+ * @parent group7
+ * @text 界面文本配置
+ * @parent menuSwitch
+ * @type struct<MenuText>
+ * @desc 集中配置菜单界面中显示的所有固定文本。
+ * @default {"running":"进行中","success":"待提交","completed":"已归档","fail":"失败","all":"全部","labelDesc":"任务内容：","labelReward":"任务奖励："}
  *
- * @param ==== 默认音效设置 ====
+ * @param listIndexFormat
+ * @parent group7
+ * @text 列表序号格式
+ * @parent menuSwitch
+ * @type string
+ * @desc {0}代表序号。留空则不显示序号。例如："{0}. " 或 "【{0}】"
+ * @default {0}. 
+ * 
+ * @param listFontSize
+ * @parent group7
+ * @text 列表字号缩小量
+ * @parent menuSwitch
+ * @type number
+ * @desc 列表文字字号
+ * @default 16
+ *
+ * 
+ * @param group8
+ * @text ==== 默认音效设置 ====
  * @desc 若任务单独配置了音效，则优先使用单独的，否则使用这里的默认值。
  *
  * @param seAccept
+ * @parent group8
  * @text 任务接取时
  * @type file
  * @dir audio/se/
  *
  * @param seSuccess
+ * @parent group8
  * @text 达成目标时
  * @type file
  * @dir audio/se/
  *
  * @param seFail
+ * @parent group8
  * @text 任务失败时
  * @type file
  * @dir audio/se/
+ * 
  *
  * @command AddQuest
  * @text ➔ 接受任务
@@ -668,6 +796,7 @@
  * @parent group3
  * @type multiline_string
  *
+ * 
  * @param group4
  * @text ==== 自定义音效 ====
  * 
@@ -689,7 +818,42 @@
  * @type file
  * @dir audio/se/
  */
-
+/*~struct~MenuText:
+ * @param all
+ * @text "全部"分类名称
+ * @type string
+ * @default 全部
+ * 
+ * @param running
+ * @text "进行中"状态名
+ * @type string
+ * @default 进行中
+ * 
+ * @param success
+ * @text "待提交"状态名
+ * @type string
+ * @default 待提交
+ * 
+ * @param completed
+ * @text "已归档"状态名
+ * @type string
+ * @default 已完成
+ * 
+ * @param fail
+ * @text "已失败"状态名
+ * @type string
+ * @default 失败
+ *
+ * @param labelDesc
+ * @text "任务内容"标签
+ * @type string
+ * @default 任务内容：
+ *
+ * @param labelReward
+ * @text "任务奖励"标签
+ * @type string
+ * @default 任务奖励：
+ */
 (() => {
     const PLUGIN_NAME = "Hakubox_SimpleQuest";
     const PARAMS = PluginManager.parameters(PLUGIN_NAME);
@@ -787,6 +951,12 @@
         bgColor: PARAMS['listBackgroundColor'] || 'rgba(0,0,0,0.5)',
         headerBgColor: PARAMS['headerBackgroundColor'] || 'rgba(0,0,0,0.6)',
         borderRadius: Number(PARAMS['borderRadius'] || 8),
+
+        maxHudHeight: Number(PARAMS['maxHudHeight'] || 0),
+        hiddenHintText: PARAMS['hiddenHintText'] || '... 更多任务已隐藏 ...',
+        hiddenHintColor: PARAMS['hiddenHintColor'] || '#AAAAAA',
+        hiddenHintSize: Number(PARAMS['hiddenHintSize'] || 12),
+        gradientHeight: Number(PARAMS['gradientHeight'] || 40),
 
         outlineWidth: Number(PARAMS['fontOutlineWidth'] || 3),
         shadowDist: Number(PARAMS['fontShadowDistance'] || 1),
@@ -1729,35 +1899,96 @@
             }
 
             const totalContentHeight = currentTempY - CONFIG.sectionSpacing + CONFIG.itemPadding;
+            const contentHeight = totalContentHeight - CONFIG.y;
+            const hintAreaHeight = CONFIG.hiddenHintSize + 24;
+            const gradientHeight = CONFIG.gradientHeight;
+            const maxHeight = CONFIG.maxHudHeight;
 
-            // --- 第二阶段：绘制背景 (含修改1：渐变背景) ---
+            // 判断是否需要截断
+            const needTruncate = maxHeight > 0 && contentHeight > maxHeight;
+
+            let finalDisplayHeight;
+            let gradientStartY; // 渐变开始Y（安全区结束）
+            let gradientEndY;   // 渐变结束Y（提示区开始）
+
+            if (needTruncate) {
+                finalDisplayHeight = maxHeight;
+                gradientEndY = CONFIG.y + maxHeight - hintAreaHeight;
+                gradientStartY = gradientEndY - gradientHeight;
+            } else {
+                finalDisplayHeight = contentHeight;
+                gradientStartY = Infinity;
+                gradientEndY = Infinity;
+            }
+
+            this._contentHeight = finalDisplayHeight;
+
+            if (nonEmptyGroups === 0) {
+                this._contentHeight = 0;
+                return;
+            }
+
+            // --- 绘制背景 ---
             if (CONFIG.showBg) {
                 this.drawRoundedRect(
                     CONFIG.x,
                     CONFIG.y,
                     CONFIG.width,
-                    totalContentHeight - CONFIG.y,
+                    finalDisplayHeight,
                     CONFIG.borderRadius,
                     parseColor(CONFIG.bgColor)
                 );
             }
 
-            // --- 第三阶段：绘制内容 ---
+            // --- 绘制内容 ---
             const dx = CONFIG.x + CONFIG.itemPadding;
             const dw = CONFIG.width - CONFIG.itemPadding * 2;
+
+            let hasHiddenTasks = false;
 
             for (let i = 0; i < layoutInfo.length; i++) {
                 const layout = layoutInfo[i];
                 let dy = layout.y;
+
+                // 分组标题起始位置超过渐变结束位置，不再绘制
+                if (needTruncate && dy >= gradientEndY) {
+                    hasHiddenTasks = true;
+                    break;
+                }
 
                 this.drawGroupTitle(layout.groupMeta, CONFIG.x, dy, CONFIG.width);
                 dy += 32;
 
                 for (let o = 0; o < layout.items.length; o++) {
                     const item = layout.items[o];
+
+                    // 任务起始位置超过渐变结束位置，停止绘制
+                    if (needTruncate && dy >= gradientEndY) {
+                        hasHiddenTasks = true;
+                        break;
+                    }
+
+                    // 正常绘制任务（即使会进入渐隐区也画）
                     const itemH = this.drawTaskItem(item, dx, dy, dw, false);
+
+                    // 检查是否有任务进入渐隐区或被完全隐藏
+                    if (needTruncate && dy + itemH > gradientStartY) {
+                        hasHiddenTasks = true;
+                    }
+
                     dy += itemH + CONFIG.taskSpacing;
                 }
+
+                // 如果已经有隐藏内容且下一个任务会超出，跳出循环
+                if (hasHiddenTasks && needTruncate) {
+                    // 继续检查是否还有更多分组
+                    if (i < layoutInfo.length - 1) break;
+                }
+            }
+
+            // --- 绘制截断效果 ---
+            if (needTruncate) {
+                this.drawTruncateEffect(CONFIG.x, gradientStartY, gradientEndY, CONFIG.width);
             }
         }
 
@@ -1795,6 +2026,66 @@
             ctx.shadowColor = "transparent";
             ctx.fill();
             ctx.restore();
+        }
+
+        /**
+         * 绘制截断效果：渐隐遮罩 + 分割线 + 提示文字
+         * @param {number} x - 左边距
+         * @param {number} gradientStartY - 渐变开始位置
+         * @param {number} gradientEndY - 渐变结束位置
+         * @param {number} width - 宽度
+         */
+        drawTruncateEffect(x, gradientStartY, gradientEndY, width) {
+            const ctx = this.bitmap.context;
+            const gradientHeight = gradientEndY - gradientStartY;
+
+            // 1. 绘制渐隐遮罩（让内容从不透明渐变到透明）
+            ctx.save();
+            const fadeGradient = ctx.createLinearGradient(x, gradientStartY, x, gradientEndY);
+            fadeGradient.addColorStop(0, 'rgba(0,0,0,0)');
+            fadeGradient.addColorStop(1, 'rgba(0,0,0,1)');
+
+            // 使用擦除模式让内容渐隐
+            ctx.globalCompositeOperation = 'destination-out';
+            ctx.fillStyle = fadeGradient;
+
+            // A. 擦除渐变区域
+            ctx.fillRect(x, gradientStartY, width, gradientHeight);
+
+            // 【修复关键点】：擦除渐变区下方的所有溢出内容
+            // 定义一个足够高的高度，确保下方的长文本被完全擦除
+            const safeBottomClearHeight = this.bitmap.height - gradientEndY;
+            ctx.fillStyle = 'rgba(0,0,0,1)'; // 纯色完全擦除
+            ctx.fillRect(x, gradientEndY, width, safeBottomClearHeight);
+
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.restore();
+
+            // 2. 绘制分割线（半透明白色带阴影）
+            // 注意：分割线和文字是在擦除之后绘制的，所以会正常显示
+            const lineY = gradientEndY + 8;
+            ctx.save();
+            ctx.shadowColor = 'rgba(0,0,0,0.6)';
+            ctx.shadowBlur = 3;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 2;
+            ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(x + 15, lineY);
+            ctx.lineTo(x + width - 15, lineY);
+            ctx.stroke();
+            ctx.restore();
+
+            // 3. 绘制提示文字
+            const textY = lineY + 6;
+            this.bitmap.fontSize = CONFIG.hiddenHintSize;
+            this.bitmap.textColor = parseColor(CONFIG.hiddenHintColor);
+            this.bitmap.outlineWidth = 2;
+            this.bitmap.outlineColor = 'rgba(0,0,0,0.8)';
+            ctx.shadowColor = 'transparent';
+
+            this.bitmap.drawText(TranslateUtils.getText(CONFIG.hiddenHintText), x, textY, width, CONFIG.hiddenHintSize + 4, 'center');
         }
 
         drawGroupTitle(meta, x, y, fullWidth) {
@@ -1836,7 +2127,7 @@
             if (typeof TranslateUtils !== 'undefined') {
                 displayTitle = TranslateUtils.getText(displayTitle);
             }
-            
+
             // 标题行高 = 字体大小 + 4像素缓冲
             const titleLineHeight = CONFIG.fontSizeTitle + CONFIG.lineSpacing;
 
@@ -2042,6 +2333,502 @@
             return lines;
         }
     }
+
+    // ======================================================================
+    // 6. 任务列表场景 (Scene_Quest & Windows) - 最终整合版
+    // ======================================================================
+
+    const MENU_PARAMS = {
+        get enabled() { return !(Number(PARAMS['menuSwitchId'] || 0)) || $gameSwitches.value(PARAMS['menuSwitchId']) },
+        label: PARAMS['menuLabel'] || '任务记录',
+        bgImage: PARAMS['menuBackground'] || '',
+        
+        indexFormat: PARAMS['listIndexFormat'] || '',
+        fontSizeDiff: Number(PARAMS['listFontSizeDiff'] || 4), // 字号减小量
+
+        // 默认文本，防止解析失败
+        text: {
+            all: "全部",
+            running: "进行中",
+            success: "待提交",
+            completed: "已完成",
+            fail: "失败",
+            labelDesc: "任务内容：",
+            labelReward: "任务奖励："
+        }
+    };
+    
+    // [修改] 统一解析 MenuText 结构体
+    if(PARAMS['menuTextConfig']) {
+        try {
+            const _cfg = JSON.parse(PARAMS['menuTextConfig']);
+            MENU_PARAMS.text = {
+                all: _cfg.all || "全部",
+                running: _cfg.running || "进行中",
+                success: _cfg.success || "待提交",
+                completed: _cfg.completed || "已完成",
+                fail: _cfg.fail || "失败",
+                labelDesc: _cfg.labelDesc || "任务内容：",
+                labelReward: _cfg.labelReward || "任务奖励："
+            };
+        } catch(e) {
+            console.warn("SimpleQuest: MenuText config parse error, using defaults.");
+        }
+    }
+
+    // ----------------------------------------------------------------------
+    // Window_QuestCategory: 顶部状态分类过滤器
+    // ----------------------------------------------------------------------
+    class Window_QuestCategory extends Window_HorzCommand {
+        initialize(rect) {
+            super.initialize(rect);
+        }
+
+        maxCols() {
+            return 5;
+        }
+
+        makeCommandList() {
+            // 使用统一配置中的文本
+            this.addCommand(MENU_PARAMS.text.all, 'all');
+            this.addCommand(MENU_PARAMS.text.running, 'running');
+            this.addCommand(MENU_PARAMS.text.success, 'success');
+            this.addCommand(MENU_PARAMS.text.completed, 'completed');
+            this.addCommand(MENU_PARAMS.text.fail, 'fail');
+        }
+
+        update() {
+            super.update();
+            if (this._listWindow) {
+                this._listWindow.setCategory(this.currentSymbol());
+            }
+        }
+
+        setListWindow(listWindow) {
+            this._listWindow = listWindow;
+        }
+    }
+
+    // ----------------------------------------------------------------------
+    // Window_QuestList: 左侧任务列表
+    // ----------------------------------------------------------------------
+    class Window_QuestList extends Window_Selectable {
+        initialize(rect) {
+            super.initialize(rect);
+            this._data = [];
+            this._category = 'all'; // 默认显示全部
+        }
+
+        setCategory(symbol) {
+            if (this._category !== symbol) {
+                this._category = symbol;
+                this.refresh();
+                this.select(0);
+            }
+        }
+
+        setDetailWindow(detailWindow) {
+            this._detailWindow = detailWindow;
+        }
+
+        makeItemList() {
+            const allQuests = $gameSystem._questInstances || [];
+            
+            // 1. 筛选逻辑
+            let filtered = allQuests.filter(q => {
+                const tpl = CONFIG.templates[q.templateId];
+                if (tpl && tpl.conditionFunc) {
+                     try { if(!tpl.conditionFunc.call(window)) return false; } catch(e){}
+                }
+
+                switch (this._category) {
+                    case 'all': return true; // 显示所有已接取任务
+                    case 'running': return !q.isCompleted && q.status === 0; 
+                    case 'success': return !q.isCompleted && q.status === 1;
+                    case 'completed': return q.isCompleted && q.status !== 2; 
+                    case 'fail': return q.status === 2;
+                }
+                return false;
+            });
+
+            // 2. 排序逻辑 (优先级 > 时间倒序)
+            filtered.sort((a, b) => {
+                const catA = CONFIG.categories.find(c => c.id === a.typeId);
+                const catB = CONFIG.categories.find(c => c.id === b.typeId);
+                const pA = catA ? Number(catA.priority) : 999;
+                const pB = catB ? Number(catB.priority) : 999;
+                
+                if (pA !== pB) return pA - pB;
+                // 时间倒序：这里假设 timestamp 存在，或者利用数组本身的顺序（新任务 index大）
+                // 暂时利用 timestamp 做倒序
+                return (b.timestamp || 0) - (a.timestamp || 0);
+            });
+
+            this._data = filtered;
+        }
+        
+        maxItems() {
+            return this._data ? this._data.length : 0;
+        }
+
+        drawItem(index) {
+            const item = this._data[index];
+            if (item) {
+                const rect = this.itemLineRect(index);
+                const catInfo = CONFIG.categories.find(c => c.id === item.typeId);
+                
+                if (catInfo) {
+                    this.changeTextColor(parseColor(catInfo.color));
+                } else {
+                    this.resetTextColor();
+                }
+
+                let title = Sprite_QuestHUD.prototype.processText ? 
+                            Sprite_QuestHUD.prototype.processText(item.title, item) : item.title;
+                
+                if (typeof TranslateUtils !== 'undefined') {
+                    title = TranslateUtils.getText(title);
+                }
+
+                // 序号处理
+                let prefix = "";
+                if (MENU_PARAMS.indexFormat) {
+                    prefix = MENU_PARAMS.indexFormat.replace("{0}", String(index + 1));
+                }
+                const fullText = prefix + title;
+
+                // 字号缩小处理
+                const originalFontSize = this.contents.fontSize;
+                this.contents.fontSize = originalFontSize - MENU_PARAMS.fontSizeDiff;
+
+                // 垂直居中微调
+                const offset = Math.floor(MENU_PARAMS.fontSizeDiff / 2);
+                this.drawText(fullText, rect.x + 2, rect.y + offset, rect.width - 4, "left");
+
+                this.contents.fontSize = originalFontSize;
+                this.resetTextColor();
+            }
+        }
+
+        update() {
+            super.update();
+            if (this._detailWindow) {
+                this._detailWindow.setItem(this._data[this.index()]);
+            }
+        }
+
+        refresh() {
+            this.makeItemList();
+            this.createContents();
+            this.drawAllItems();
+        }
+    }
+
+    // ----------------------------------------------------------------------
+    // Window_QuestDetail: 右侧详细信息
+    // ----------------------------------------------------------------------
+    class Window_QuestDetail extends Window_Base {
+        initialize(rect) {
+            super.initialize(rect);
+            this._item = null;
+        }
+
+        setItem(item) {
+            if (this._item !== item) {
+                this._item = item;
+                this.refresh();
+            }
+        }
+
+        // 复用 Sprite_QuestHUD 的换行逻辑
+        wrapText(text, maxWidth) {
+            // 这里我们需要借用 Sprite_QuestHUD 的原型方法，但要把 上下文(this) 指向当前的 contents
+            // 因为 wrapText 内部使用了 this.measureRealWidth -> this.bitmap.measureTextWidth
+            
+            // 1. 创建一个模拟 Sprite_QuestHUD 行为的代理对象
+            const proxy = {
+                bitmap: this.contents,
+                measureRealWidth: Sprite_QuestHUD.prototype.measureRealWidth,
+                wrapText: Sprite_QuestHUD.prototype.wrapText
+            };
+            
+            // 2. 调用 wrapText
+            return proxy.wrapText(text, maxWidth);
+        }
+        refresh() {
+            this.contents.clear();
+            if (!this._item) return;
+            const tpl = CONFIG.templates[this._item.templateId];
+            const item = this._item;
+            
+            const processText = (txt) => {
+                let res = Sprite_QuestHUD.prototype.processText ? Sprite_QuestHUD.prototype.processText(txt, item) : txt;
+                if (typeof TranslateUtils !== 'undefined') res = TranslateUtils.getText(res);
+                return res;
+            };
+            const padding = 24; 
+            let y = padding;
+            const width = this.contentsWidth() - padding * 2;
+            const lh = this.lineHeight();
+            // 1. 标题
+            this.contents.fontSize = 30; 
+            this.contents.fontBold = true;
+            this.changeTextColor(ColorManager.systemColor());
+            this.drawText(processText(item.title), padding, y, width, "left");
+            this.contents.fontBold = false;
+            this.contents.fontSize = $gameSystem.mainFontSize();
+            y += lh * 2.0;
+            // 分割线
+            this.contents.context.fillStyle = "rgba(255,255,255,0.3)";
+            this.contents.context.fillRect(padding, y - 12, width, 2);
+            y += 8;
+            // 2. 类型与状态
+            const catInfo = CONFIG.categories.find(c => c.id === item.typeId);
+            const typeName = catInfo ? catInfo.name : "其他任务";
+            
+            let statusStr = "";
+            let statusColor = 0; 
+            if (item.isCompleted) {
+                statusStr = MENU_PARAMS.text.completed;
+                statusColor = CONFIG.statusText[1].color; 
+            } else {
+                const statusConf = CONFIG.statusText[item.status];
+                statusStr = statusConf ? statusConf.text : "";
+                statusColor = statusConf ? statusConf.color : 0;
+                
+                if (item.status === 0) statusStr = MENU_PARAMS.text.running;
+                if (item.status === 1) statusStr = MENU_PARAMS.text.success;
+                if (item.status === 2) statusStr = MENU_PARAMS.text.fail;
+            }
+            // 类型
+            this.changeTextColor(ColorManager.systemColor());
+            const typeLabelWidth = this.textWidth("类型: ");
+            this.drawText("类型: ", padding, y, typeLabelWidth);
+            if(catInfo) this.changeTextColor(parseColor(catInfo.color));
+            else this.resetTextColor();
+            this.drawText(typeName, padding + typeLabelWidth, y, 200);
+            this.resetTextColor();
+            // 状态
+            const statusLabelWidth = this.textWidth("状态: ");
+            const statusValWidth = this.textWidth(statusStr);
+            const statusX = padding + width - statusValWidth;
+            this.changeTextColor(parseColor(statusColor));
+            this.drawText(statusStr, statusX, y, statusValWidth, "right");
+            this.changeTextColor(ColorManager.systemColor());
+            this.drawText("状态: ", statusX - statusLabelWidth, y, statusLabelWidth);
+            this.resetTextColor();
+            y += lh * 1.8;
+            // 3. 任务内容 (使用 HUD 换行逻辑)
+            if (item.desc) {
+                this.changeTextColor(ColorManager.systemColor()); 
+                this.drawText(MENU_PARAMS.text.labelDesc, padding, y, width);
+                this.resetTextColor();
+                y += lh;
+                const descIndent = 4;
+                const descText = processText(item.desc);
+                const descRectX = padding;
+                const descRectW = width - descIndent;
+                // --- 修改开始：使用 HUD 的换行逻辑 ---
+                // 首先按换行符物理拆分
+                const rawLines = descText.split('\n');
+                
+                for (let k = 0; k < rawLines.length; k++) {
+                    // 对每一行物理文本，调用 HUD 的 wrapText 进行自动换行
+                    const wrappedLines = this.wrapText(rawLines[k], descRectW);
+                    
+                    for (let w = 0; w < wrappedLines.length; w++) {
+                        // 逐行绘制
+                        this.drawTextEx(wrappedLines[w], descRectX, y);
+                        y += lh; // 增加一行高度
+                    }
+                }
+                y += 10; // 段落间距
+                // --- 修改结束 ---
+            } else {
+                y += lh;
+            }
+            // 4. 进度条
+            if (!item.isCompleted && item.status === 0 && item.maxProgress > 1) {
+                const rate = item.progress / item.maxProgress;
+                const gaugeY = y + 6;
+                const gaugeHeight = lh - 12;
+                
+                // 绘制背景槽 (灰色半透明)
+                this.contents.context.fillStyle = "rgba(0, 0, 0, 0.5)";
+                this.contents.context.fillRect(padding, gaugeY, width, gaugeHeight);
+                
+                // 绘制进度条 (使用系统颜色渐变)
+                const color1 = ColorManager.hpGaugeColor1();
+                const color2 = ColorManager.hpGaugeColor2();
+                const fillW = Math.floor(width * rate);
+                
+                // 创建渐变
+                const gradient = this.contents.context.createLinearGradient(padding, gaugeY, padding + fillW, gaugeY);
+                gradient.addColorStop(0, color1);
+                gradient.addColorStop(1, color2);
+                
+                this.contents.context.fillStyle = gradient;
+                this.contents.context.fillRect(padding, gaugeY, fillW, gaugeHeight);
+                
+                // 绘制边框 (可选)
+                // this.contents.context.strokeStyle = "rgba(255, 255, 255, 0.5)";
+                // this.contents.context.strokeRect(padding, gaugeY, width, gaugeHeight);
+                // 绘制文字
+                this.contents.outlineWidth = 3;
+                this.drawText(`${item.progress} / ${item.maxProgress}`, padding, y, width, "center");
+                this.contents.outlineWidth = 0; 
+                y += lh * 1.5;
+            }
+            // 5. 任务奖励
+            if (tpl.rewardText) {
+                const rewardY = this.contentsHeight() - lh * 2 - padding;
+                const drawY = Math.max(y, rewardY);
+                if (drawY > y + 20) { 
+                   this.contents.context.fillStyle = "rgba(255,255,255,0.15)";
+                   this.contents.context.fillRect(padding, drawY - 8, width, 1);
+                }
+                this.changeTextColor(ColorManager.systemColor());
+                const labelW = this.textWidth(MENU_PARAMS.text.labelReward);
+                this.drawText(MENU_PARAMS.text.labelReward, padding, drawY, labelW);
+                this.changeTextColor(ColorManager.textColor(6)); 
+                this.drawText(tpl.rewardText, padding + labelW, drawY, width - labelW, "left");
+                this.resetTextColor();
+            }
+        }
+        
+        drawTextExWrapped(text, x, y, maxWidth) {
+            const startY = y;
+            let currentY = y;
+            const lines = text.split('\n');
+            const lineHeight = this.lineHeight();
+            
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                this.drawTextEx(line, x, currentY);
+                currentY += lineHeight;
+            }
+            return currentY - startY;
+        }
+    }
+
+    // ----------------------------------------------------------------------
+    // Scene_Quest: 主场景
+    // ----------------------------------------------------------------------
+    class Scene_Quest extends Scene_MenuBase {
+        create() {
+            super.create();
+            this.createCategoryWindow();
+            this.createListWindow();
+            this.createDetailWindow();
+        }
+
+        createBackground() {
+            if (MENU_PARAMS.bgImage) {
+                this._backgroundSprite = new Sprite();
+                this._backgroundSprite.bitmap = ImageManager.loadPicture(MENU_PARAMS.bgImage);
+                this.addChild(this._backgroundSprite);
+            } else {
+                super.createBackground();
+            }
+        }
+
+        createCategoryWindow() {
+            const rect = this.categoryWindowRect();
+            this._categoryWindow = new Window_QuestCategory(rect);
+            this._categoryWindow.setHandler("cancel", this.popScene.bind(this));
+            this._categoryWindow.setHandler("pagedown", this.nextActor.bind(this)); 
+            this._categoryWindow.setHandler("pageup", this.previousActor.bind(this));
+            this._categoryWindow.setHandler("ok", this.onCategoryOk.bind(this));
+            this.addWindow(this._categoryWindow);
+        }
+
+        categoryWindowRect() {
+            const wx = 0;
+            const wy = this.mainAreaTop();
+            const ww = Graphics.boxWidth;
+            const wh = this.calcWindowHeight(1, true);
+            return new Rectangle(wx, wy, ww, wh);
+        }
+
+        createListWindow() {
+            const rect = this.listWindowRect();
+            this._listWindow = new Window_QuestList(rect);
+            this._listWindow.setHandler("cancel", this.onListCancel.bind(this));
+            // 列表确认键 -> 可选：无动作，或播放音效
+            this._listWindow.setHandler("ok", this.onListOk.bind(this)); 
+            
+            this.addWindow(this._listWindow);
+            
+            // 关键关联
+            this._categoryWindow.setListWindow(this._listWindow);
+            
+            // 【修复关键点】：手动强制刷新一次
+            // 确保初始状态下的数据被正确加载
+            this._listWindow.refresh();
+        }
+        
+        onListOk() {
+            this._listWindow.activate(); 
+        }
+
+        listWindowRect() {
+            const wx = 0;
+            const wy = this._categoryWindow.y + this._categoryWindow.height;
+            const ww = Math.floor(Graphics.boxWidth * 0.35); 
+            const wh = this.mainAreaBottom() - wy;
+            return new Rectangle(wx, wy, ww, wh);
+        }
+
+        createDetailWindow() {
+            const rect = this.detailWindowRect();
+            this._detailWindow = new Window_QuestDetail(rect);
+            this._listWindow.setDetailWindow(this._detailWindow);
+            this.addWindow(this._detailWindow);
+        }
+
+        detailWindowRect() {
+            const wx = this._listWindow.width;
+            const wy = this._listWindow.y;
+            const ww = Graphics.boxWidth - wx;
+            const wh = this._listWindow.height;
+            return new Rectangle(wx, wy, ww, wh);
+        }
+
+        onCategoryOk() {
+            this._categoryWindow.deactivate();
+            this._listWindow.activate();
+            this._listWindow.select(0);
+        }
+
+        onListCancel() {
+            this._listWindow.deselect();
+            this._listWindow.deactivate();
+            this._categoryWindow.activate();
+        }
+    }
+
+    // ----------------------------------------------------------------------
+    // Main Menu Integration: 注入主菜单
+    // ----------------------------------------------------------------------
+    const _Window_MenuCommand_addOriginalCommands = Window_MenuCommand.prototype.addOriginalCommands;
+    Window_MenuCommand.prototype.addOriginalCommands = function () {
+        _Window_MenuCommand_addOriginalCommands.call(this);
+        if (MENU_PARAMS.enabled) {
+            this.addCommand(MENU_PARAMS.label, 'quest', true);
+        }
+    };
+
+    const _Scene_Menu_createCommandWindow = Scene_Menu.prototype.createCommandWindow;
+    Scene_Menu.prototype.createCommandWindow = function () {
+        _Scene_Menu_createCommandWindow.call(this);
+        if (MENU_PARAMS.enabled) {
+            this._commandWindow.setHandler('quest', this.commandQuest.bind(this));
+        }
+    };
+
+    Scene_Menu.prototype.commandQuest = function () {
+        SceneManager.push(Scene_Quest);
+    };
 
     // ======================================================================
     // 4. 挂载与场景恢复 (Integration)
